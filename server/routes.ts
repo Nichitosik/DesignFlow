@@ -26,6 +26,25 @@ export function broadcast(eventId: number, data: any) {
   });
 }
 
+function requireRole(...allowedRoles: string[]) {
+  return async (req: any, res: any, next: any) => {
+    try {
+      if (!req.user?.claims?.sub) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+      const userId = req.user.claims.sub;
+      const roles = await storage.getUserRoles(userId);
+      const hasRole = roles.some(r => allowedRoles.includes(r.role));
+      if (!hasRole) {
+        return res.status(403).json({ message: "Insufficient permissions" });
+      }
+      next();
+    } catch (error) {
+      res.status(500).json({ message: "Authorization check failed" });
+    }
+  };
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   await setupAuth(app);
   registerAuthRoutes(app);
@@ -50,7 +69,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/events", isAuthenticated, async (req: any, res) => {
+  app.post("/api/events", isAuthenticated, requireRole("organizer"), async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const roles = await storage.getUserRoles(userId);
@@ -66,7 +85,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/events/:id", isAuthenticated, async (req, res) => {
+  app.patch("/api/events/:id", isAuthenticated, requireRole("organizer"), async (req, res) => {
     try {
       const event = await storage.updateEvent(Number(req.params.id), req.body);
       if (!event) return res.status(404).json({ message: "Event not found" });
@@ -115,7 +134,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/tickets/:id/scan", isAuthenticated, async (req: any, res) => {
+  app.post("/api/tickets/:id/scan", isAuthenticated, requireRole("staff", "organizer"), async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const ticket = await storage.getTicket(Number(req.params.id));
@@ -146,7 +165,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/events/:eventId/zones", isAuthenticated, async (req, res) => {
+  app.post("/api/events/:eventId/zones", isAuthenticated, requireRole("organizer"), async (req, res) => {
     try {
       const parsed = insertVenueZoneSchema.parse({
         ...req.body,
@@ -160,7 +179,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/zones/:id/occupancy", isAuthenticated, async (req, res) => {
+  app.patch("/api/zones/:id/occupancy", isAuthenticated, requireRole("staff", "organizer"), async (req, res) => {
     try {
       const { occupancy } = req.body;
       const zone = await storage.updateZoneOccupancy(Number(req.params.id), occupancy);
@@ -183,7 +202,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/events/:eventId/parking", isAuthenticated, async (req, res) => {
+  app.post("/api/events/:eventId/parking", isAuthenticated, requireRole("organizer"), async (req, res) => {
     try {
       const parsed = insertParkingLotSchema.parse({
         ...req.body,
@@ -197,7 +216,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/parking/:id", isAuthenticated, async (req, res) => {
+  app.patch("/api/parking/:id", isAuthenticated, requireRole("staff", "organizer"), async (req, res) => {
     try {
       const { occupied, status } = req.body;
       let lot;
@@ -237,7 +256,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/events/:eventId/notifications", isAuthenticated, async (req: any, res) => {
+  app.post("/api/events/:eventId/notifications", isAuthenticated, requireRole("staff", "organizer"), async (req: any, res) => {
     try {
       const parsed = insertNotificationSchema.parse({
         ...req.body,
@@ -273,7 +292,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/events/:eventId/recommendations/generate", isAuthenticated, async (req: any, res) => {
+  app.post("/api/events/:eventId/recommendations/generate", isAuthenticated, requireRole("organizer"), async (req: any, res) => {
     try {
       const eventId = Number(req.params.eventId);
       const event = await storage.getEvent(eventId);
@@ -416,7 +435,7 @@ Provide 2-4 recommendations as a JSON object with this structure:
   });
 
   // Scan ticket by code
-  app.post("/api/tickets/scan", isAuthenticated, async (req: any, res) => {
+  app.post("/api/tickets/scan", isAuthenticated, requireRole("staff", "organizer"), async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const { ticketCode } = req.body;

@@ -1,4 +1,4 @@
-import { Switch, Route, useLocation } from "wouter";
+import { Switch, Route, useLocation, Redirect } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -8,18 +8,38 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import RoleSelector from "@/pages/RoleSelector";
-import SpectatorDashboard from "@/pages/SpectatorDashboard";
-import StaffDashboard from "@/pages/StaffDashboard";
-import OrganizerDashboard from "@/pages/OrganizerDashboard";
 import NotFound from "@/pages/not-found";
 import { useAuth } from "@/hooks/use-auth";
 import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { LogOut, Gauge } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, lazy, Suspense } from "react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 
+const SpectatorTickets = lazy(() => import("@/pages/spectator/SpectatorTickets"));
+const SpectatorMap = lazy(() => import("@/pages/spectator/SpectatorMap"));
+const SpectatorDirections = lazy(() => import("@/pages/spectator/SpectatorDirections"));
+const SpectatorParking = lazy(() => import("@/pages/spectator/SpectatorParking"));
+
+const StaffScanner = lazy(() => import("@/pages/staff/StaffScanner"));
+const StaffMonitoring = lazy(() => import("@/pages/staff/StaffMonitoring"));
+const StaffMap = lazy(() => import("@/pages/staff/StaffMap"));
+
+const OrganizerOverview = lazy(() => import("@/pages/organizer/OrganizerOverview"));
+const OrganizerMap = lazy(() => import("@/pages/organizer/OrganizerMap"));
+const OrganizerParking = lazy(() => import("@/pages/organizer/OrganizerParking"));
+const OrganizerAnalytics = lazy(() => import("@/pages/organizer/OrganizerAnalytics"));
+const OrganizerAI = lazy(() => import("@/pages/organizer/OrganizerAI"));
+
 type UserRole = "spectator" | "staff" | "organizer";
+
+function PageLoader() {
+  return (
+    <div className="flex items-center justify-center p-12">
+      <div className="animate-pulse text-muted-foreground">Loading...</div>
+    </div>
+  );
+}
 
 function LandingPage() {
   return (
@@ -45,11 +65,17 @@ function LandingPage() {
   );
 }
 
+const roleDefaultPaths: Record<UserRole, string> = {
+  spectator: "/spectator/tickets",
+  staff: "/staff/scanner",
+  organizer: "/organizer/overview",
+};
+
 function AuthenticatedApp() {
   const { user, logout } = useAuth();
   const [role, setRole] = useState<UserRole | null>(null);
   const [, setLocation] = useLocation();
-
+  const [location] = useLocation();
   const [switching, setSwitching] = useState(false);
 
   const { data: userRoles, isLoading: rolesLoading } = useQuery<any[]>({
@@ -58,7 +84,11 @@ function AuthenticatedApp() {
 
   useEffect(() => {
     if (userRoles && userRoles.length > 0 && !role && !switching) {
-      setRole(userRoles[0].role as UserRole);
+      const savedRole = userRoles[0].role as UserRole;
+      setRole(savedRole);
+      if (location === "/" || location === "") {
+        setLocation(roleDefaultPaths[savedRole]);
+      }
     }
   }, [userRoles, role, switching]);
 
@@ -67,7 +97,7 @@ function AuthenticatedApp() {
     queryClient.invalidateQueries({ queryKey: ["/api/user/role"] });
     setRole(selectedRole);
     setSwitching(false);
-    setLocation("/");
+    setLocation(roleDefaultPaths[selectedRole]);
   };
 
   const handleSwitchRole = () => {
@@ -117,12 +147,35 @@ function AuthenticatedApp() {
             </div>
           </header>
           <main className="flex-1 overflow-auto">
-            <Switch>
-              {role === "spectator" && <Route path="/" component={SpectatorDashboard} />}
-              {role === "staff" && <Route path="/" component={StaffDashboard} />}
-              {role === "organizer" && <Route path="/" component={OrganizerDashboard} />}
-              <Route component={NotFound} />
-            </Switch>
+            <Suspense fallback={<PageLoader />}>
+              <Switch>
+                {role === "spectator" && (
+                  <>
+                    <Route path="/spectator/tickets" component={SpectatorTickets} />
+                    <Route path="/spectator/map" component={SpectatorMap} />
+                    <Route path="/spectator/directions" component={SpectatorDirections} />
+                    <Route path="/spectator/parking" component={SpectatorParking} />
+                  </>
+                )}
+                {role === "staff" && (
+                  <>
+                    <Route path="/staff/scanner" component={StaffScanner} />
+                    <Route path="/staff/monitoring" component={StaffMonitoring} />
+                    <Route path="/staff/map" component={StaffMap} />
+                  </>
+                )}
+                {role === "organizer" && (
+                  <>
+                    <Route path="/organizer/overview" component={OrganizerOverview} />
+                    <Route path="/organizer/map" component={OrganizerMap} />
+                    <Route path="/organizer/parking" component={OrganizerParking} />
+                    <Route path="/organizer/analytics" component={OrganizerAnalytics} />
+                    <Route path="/organizer/ai" component={OrganizerAI} />
+                  </>
+                )}
+                <Route><Redirect to={roleDefaultPaths[role]} /></Route>
+              </Switch>
+            </Suspense>
           </main>
         </div>
       </div>
