@@ -1,10 +1,11 @@
 import { TicketCard } from "@/components/TicketCard";
 import { VenueMap } from "@/components/VenueMap";
 import { NotificationCard } from "@/components/NotificationCard";
+import { DirectionsPanel } from "@/components/DirectionsPanel";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Navigation, Share2, Database } from "lucide-react";
-import { useState } from "react";
+import { Database, Car } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -12,6 +13,7 @@ import eventImage from "@assets/stock_images/concert_crowd_music__8267ea97.jpg";
 
 export default function SpectatorDashboard() {
   const [activeZone, setActiveZone] = useState<string>();
+  const [simulatedParking, setSimulatedParking] = useState<any[] | null>(null);
 
   const { data: events, isLoading: eventsLoading } = useQuery<any[]>({
     queryKey: ["/api/events"],
@@ -32,6 +34,38 @@ export default function SpectatorDashboard() {
     queryKey: ["/api/events", activeEvent?.id, "notifications"],
     enabled: !!activeEvent,
   });
+
+  const { data: parking } = useQuery<any[]>({
+    queryKey: ["/api/events", activeEvent?.id, "parking"],
+    enabled: !!activeEvent,
+  });
+
+  const simulateParkingFn = useCallback(() => {
+    if (!parking || parking.length === 0) return;
+    setSimulatedParking(prev => {
+      const base = prev || parking.map((p: any) => ({ ...p }));
+      return base.map((lot: any) => {
+        const change = Math.floor(Math.random() * 11) - 3;
+        const newOccupied = Math.max(0, Math.min(lot.capacity, (lot.occupied || 0) + change));
+        const pct = (newOccupied / lot.capacity) * 100;
+        let status = lot.status;
+        if (pct >= 98) status = "full";
+        else if (pct < 98 && status === "full") status = "open";
+        return { ...lot, occupied: newOccupied, status };
+      });
+    });
+  }, [parking]);
+
+  useEffect(() => {
+    if (parking && parking.length > 0 && !simulatedParking) {
+      setSimulatedParking(parking.map((p: any) => ({ ...p })));
+    }
+  }, [parking, simulatedParking]);
+
+  useEffect(() => {
+    const interval = setInterval(simulateParkingFn, 5000);
+    return () => clearInterval(interval);
+  }, [simulateParkingFn]);
 
   const seedMutation = useMutation({
     mutationFn: () => apiRequest("POST", "/api/seed"),
@@ -85,6 +119,11 @@ export default function SpectatorDashboard() {
   const eventDate = activeEvent.date ? new Date(activeEvent.date).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) : "";
   const ticket = myTickets?.[0];
 
+  const displayParking = simulatedParking || parking || [];
+  const totalParkingCapacity = displayParking.reduce((sum: number, p: any) => sum + p.capacity, 0);
+  const totalParkingOccupied = displayParking.reduce((sum: number, p: any) => sum + (p.occupied || 0), 0);
+  const parkingAvailable = totalParkingCapacity - totalParkingOccupied;
+
   return (
     <div className="p-6 space-y-6 max-w-6xl mx-auto">
       <div className="relative h-48 rounded-lg overflow-hidden">
@@ -118,21 +157,44 @@ export default function SpectatorDashboard() {
             </Card>
           )}
 
-          <Card>
-            <CardHeader>
-              <h3 className="font-semibold">Quick Actions</h3>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <Button className="w-full justify-start" variant="outline" data-testid="button-directions">
-                <Navigation className="h-4 w-4 mr-2" />
-                Get Directions to Your Seat
-              </Button>
-              <Button className="w-full justify-start" variant="outline" data-testid="button-share">
-                <Share2 className="h-4 w-4 mr-2" />
-                Share Your Ticket
-              </Button>
-            </CardContent>
-          </Card>
+          {displayParking.length > 0 && (
+            <Card data-testid="parking-availability">
+              <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+                <h3 className="font-semibold flex items-center gap-2">
+                  <Car className="h-5 w-5" />
+                  Parking Availability
+                </h3>
+                <span className={`text-lg font-bold ${parkingAvailable > 200 ? "text-[hsl(142,70%,45%)]" : parkingAvailable > 50 ? "text-[hsl(38,90%,55%)]" : "text-[hsl(0,80%,55%)]"}`}>
+                  {parkingAvailable} spots
+                </span>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {displayParking.map((lot: any) => {
+                  const pct = lot.capacity > 0 ? ((lot.occupied || 0) / lot.capacity) * 100 : 0;
+                  const available = lot.capacity - (lot.occupied || 0);
+                  return (
+                    <div key={lot.id} className="flex items-center justify-between gap-2" data-testid={`parking-lot-${lot.id}`}>
+                      <div className="min-w-0 flex-1">
+                        <span className="text-sm font-medium">{lot.name}</span>
+                        <div className="h-2 bg-muted rounded-full overflow-hidden mt-1">
+                          <div
+                            className="h-full rounded-full transition-all"
+                            style={{
+                              width: `${Math.min(pct, 100)}%`,
+                              backgroundColor: pct >= 90 ? "hsl(0,80%,55%)" : pct >= 70 ? "hsl(38,90%,55%)" : "hsl(142,70%,45%)",
+                            }}
+                          />
+                        </div>
+                      </div>
+                      <span className="text-sm text-muted-foreground whitespace-nowrap">{available} free</span>
+                    </div>
+                  );
+                })}
+              </CardContent>
+            </Card>
+          )}
+
+          <DirectionsPanel />
         </div>
 
         <div className="space-y-6">

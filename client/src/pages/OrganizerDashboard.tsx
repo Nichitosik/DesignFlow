@@ -3,16 +3,27 @@ import { CapacityMeter } from "@/components/CapacityMeter";
 import { ParkingMonitor } from "@/components/ParkingMonitor";
 import { VenueMap } from "@/components/VenueMap";
 import { NotificationCard } from "@/components/NotificationCard";
+import { DirectionsPanel } from "@/components/DirectionsPanel";
 import { Button } from "@/components/ui/button";
-import { Users, Ticket, TrendingUp, AlertTriangle, Sparkles, Database, Loader2 } from "lucide-react";
-import { useState } from "react";
+import { Badge } from "@/components/ui/badge";
+import { Users, Ticket, TrendingUp, AlertTriangle, Sparkles, Database, Loader2, Brain, Shield, Car, Zap, CheckCircle2 } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 
+const recTypeConfig: Record<string, { icon: any; color: string; label: string }> = {
+  crowd_flow: { icon: Users, color: "hsl(260 80% 50%)", label: "Crowd Flow" },
+  safety: { icon: Shield, color: "hsl(0 80% 55%)", label: "Safety" },
+  parking: { icon: Car, color: "hsl(200 80% 50%)", label: "Parking" },
+  capacity: { icon: Zap, color: "hsl(38 90% 55%)", label: "Capacity" },
+  general: { icon: Brain, color: "hsl(142 70% 45%)", label: "General" },
+};
+
 export default function OrganizerDashboard() {
   const [activeZone, setActiveZone] = useState<string>();
+  const [simulatedParking, setSimulatedParking] = useState<any[] | null>(null);
   const { toast } = useToast();
 
   const { data: events, isLoading: eventsLoading } = useQuery<any[]>({
@@ -45,6 +56,33 @@ export default function OrganizerDashboard() {
     queryKey: ["/api/events", activeEvent?.id, "recommendations"],
     enabled: !!activeEvent,
   });
+
+  const simulateParking = useCallback(() => {
+    if (!parking || parking.length === 0) return;
+    setSimulatedParking(prev => {
+      const base = prev || parking.map((p: any) => ({ ...p }));
+      return base.map((lot: any) => {
+        const change = Math.floor(Math.random() * 11) - 3;
+        const newOccupied = Math.max(0, Math.min(lot.capacity, (lot.occupied || 0) + change));
+        const pct = (newOccupied / lot.capacity) * 100;
+        let status = lot.status;
+        if (pct >= 98) status = "full";
+        else if (pct < 98 && status === "full") status = "open";
+        return { ...lot, occupied: newOccupied, status };
+      });
+    });
+  }, [parking]);
+
+  useEffect(() => {
+    if (parking && parking.length > 0 && !simulatedParking) {
+      setSimulatedParking(parking.map((p: any) => ({ ...p })));
+    }
+  }, [parking, simulatedParking]);
+
+  useEffect(() => {
+    const interval = setInterval(simulateParking, 5000);
+    return () => clearInterval(interval);
+  }, [simulateParking]);
 
   const generateRecsMutation = useMutation({
     mutationFn: async () => {
@@ -88,7 +126,8 @@ export default function OrganizerDashboard() {
     type: z.type,
   }));
 
-  const mappedParking = (parking || []).map((p: any) => ({
+  const displayParking = simulatedParking || parking || [];
+  const mappedParking = displayParking.map((p: any) => ({
     id: String(p.id),
     name: p.name,
     capacity: p.capacity,
@@ -188,9 +227,15 @@ export default function OrganizerDashboard() {
         <div className="lg:col-span-2 space-y-6">
           <VenueMap zones={mappedZones} activeZone={activeZone} onZoneClick={setActiveZone} />
 
-          <Card>
+          <Card data-testid="ai-recommendations">
             <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
-              <h3 className="font-semibold">AI Flow Recommendations</h3>
+              <div className="flex items-center gap-2">
+                <Brain className="h-5 w-5 text-primary" />
+                <div>
+                  <h3 className="font-semibold">AI Crowd Flow Recommendations</h3>
+                  <p className="text-xs text-muted-foreground">Powered by GPT-5 analysis</p>
+                </div>
+              </div>
               <Button
                 size="sm"
                 onClick={() => generateRecsMutation.mutate()}
@@ -202,41 +247,80 @@ export default function OrganizerDashboard() {
                 ) : (
                   <Sparkles className="h-4 w-4 mr-1" />
                 )}
-                {generateRecsMutation.isPending ? "Generating..." : "Generate"}
+                {generateRecsMutation.isPending ? "Analyzing..." : "Generate"}
               </Button>
             </CardHeader>
             <CardContent className="space-y-4">
-              {(recommendations || []).map((rec: any) => (
-                <div key={rec.id} className={`p-4 rounded-md ${rec.applied ? "bg-muted" : "bg-primary/5 border border-primary/20"}`}>
-                  <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
-                    <p className="text-sm font-medium">{rec.type}</p>
-                    <span className="text-xs text-muted-foreground">{rec.confidence}% confidence</span>
+              {(recommendations || []).map((rec: any) => {
+                const config = recTypeConfig[rec.type] || recTypeConfig.general;
+                const IconComp = config.icon;
+
+                return (
+                  <div key={rec.id} className={`p-4 rounded-md border transition-all ${rec.applied ? "bg-muted/50 border-muted" : "border-primary/20"}`} data-testid={`recommendation-${rec.id}`}>
+                    <div className="flex items-start gap-3">
+                      <div className="w-8 h-8 rounded-md flex items-center justify-center shrink-0" style={{ backgroundColor: `${config.color}20` }}>
+                        <IconComp className="h-4 w-4" style={{ color: config.color }} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2 mb-1 flex-wrap">
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="text-xs capitalize">{config.label}</Badge>
+                            {rec.applied && (
+                              <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                <CheckCircle2 className="h-3 w-3 text-[hsl(142,70%,45%)]" />
+                                Applied
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden">
+                              <div className="h-full rounded-full" style={{ width: `${rec.confidence}%`, backgroundColor: config.color }} />
+                            </div>
+                            <span className="text-xs text-muted-foreground">{rec.confidence}%</span>
+                          </div>
+                        </div>
+                        <p className="text-sm mt-1">{rec.recommendation}</p>
+                        {!rec.applied && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="mt-3"
+                            onClick={() => applyRecMutation.mutate(rec.id)}
+                            disabled={applyRecMutation.isPending}
+                            data-testid={`button-apply-rec-${rec.id}`}
+                          >
+                            Apply Recommendation
+                          </Button>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                  <p className="text-sm text-muted-foreground mb-3">{rec.recommendation}</p>
-                  {!rec.applied && (
-                    <Button
-                      size="sm"
-                      onClick={() => applyRecMutation.mutate(rec.id)}
-                      disabled={applyRecMutation.isPending}
-                      data-testid={`button-apply-rec-${rec.id}`}
-                    >
-                      Apply Recommendation
-                    </Button>
-                  )}
-                  {rec.applied && <span className="text-xs text-muted-foreground">Applied</span>}
-                </div>
-              ))}
+                );
+              })}
               {(!recommendations || recommendations.length === 0) && (
-                <p className="text-sm text-muted-foreground text-center py-4">
-                  No recommendations yet. Click "Generate" to get AI-powered insights.
-                </p>
+                <div className="text-center py-8">
+                  <Brain className="h-10 w-10 text-muted-foreground/30 mx-auto mb-3" />
+                  <p className="text-sm text-muted-foreground">
+                    No recommendations yet. Click "Generate" to get AI-powered crowd flow insights based on current event data.
+                  </p>
+                </div>
               )}
             </CardContent>
           </Card>
+
+          <DirectionsPanel />
         </div>
 
         <div className="space-y-6">
           <ParkingMonitor lots={mappedParking} />
+
+          {simulatedParking && (
+            <div className="text-center">
+              <p className="text-xs text-muted-foreground">
+                Parking data updates every 5 seconds (live simulation)
+              </p>
+            </div>
+          )}
 
           <Card>
             <CardHeader>
