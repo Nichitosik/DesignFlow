@@ -415,6 +415,87 @@ Provide 2-4 recommendations as a JSON object with this structure:
     }
   });
 
+  // Scan ticket by code
+  app.post("/api/tickets/scan", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { ticketCode } = req.body;
+      const ticket = await storage.getTicketByCode(ticketCode);
+      if (!ticket) return res.status(404).json({ message: "Ticket not found" });
+      if (ticket.status === "used") return res.status(400).json({ message: "Ticket already used", ticket });
+      if (ticket.status === "invalid") return res.status(400).json({ message: "Ticket is invalid", ticket });
+
+      const updated = await storage.updateTicketStatus(ticket.id, "used", userId);
+      if (updated) {
+        broadcast(ticket.eventId, { type: "ticket_scanned", data: updated });
+      }
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to scan ticket" });
+    }
+  });
+
+  // Seed demo data
+  app.post("/api/seed", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+
+      await storage.setUserRole({ userId, role: "organizer" });
+
+      const event = await storage.createEvent({
+        name: "Summer Music Festival 2025",
+        description: "The biggest summer music event featuring top artists from around the world.",
+        date: new Date("2025-08-15"),
+        startTime: "18:00",
+        endTime: "23:00",
+        venue: "Arena Nationala, Bucharest",
+        status: "active",
+        createdBy: userId,
+        maxCapacity: 10000,
+      });
+
+      const zoneData = [
+        { eventId: event.id, name: "Main Stage", type: "stage" as const, capacity: 5000, x: 35, y: 10 },
+        { eventId: event.id, name: "Entrance 1", type: "entrance" as const, capacity: 500, x: 5, y: 45 },
+        { eventId: event.id, name: "Entrance 2", type: "entrance" as const, capacity: 500, x: 75, y: 45 },
+        { eventId: event.id, name: "VIP Zone A", type: "seating" as const, capacity: 200, x: 10, y: 65 },
+        { eventId: event.id, name: "General 1", type: "seating" as const, capacity: 3000, x: 70, y: 40 },
+        { eventId: event.id, name: "Facilities", type: "facilities" as const, capacity: 300, x: 50, y: 80 },
+      ];
+      for (const z of zoneData) await storage.createVenueZone(z);
+
+      const parkingData = [
+        { eventId: event.id, name: "Parking Lot A", capacity: 800, status: "open" as const },
+        { eventId: event.id, name: "Parking Lot B", capacity: 600, status: "open" as const },
+        { eventId: event.id, name: "VIP Parking", capacity: 200, status: "open" as const },
+      ];
+      for (const p of parkingData) await storage.createParkingLot(p);
+
+      const ticket = await storage.createTicket({
+        ticketCode: randomUUID(),
+        eventId: event.id,
+        userId,
+        zone: "VIP Zone A",
+        seat: "Row 5, Seat 12",
+        status: "valid",
+      });
+
+      await storage.createNotification({
+        eventId: event.id, type: "info", title: "Gates Opening Soon",
+        message: "VIP gates will open in 30 minutes. Please arrive early.",
+      });
+      await storage.createNotification({
+        eventId: event.id, type: "success", title: "Parking Available",
+        message: "Parking Lot B has plenty of available spaces.",
+      });
+
+      res.json({ event, ticket });
+    } catch (error: any) {
+      console.error("Seed error:", error);
+      res.status(500).json({ message: "Failed to seed data", error: error.message });
+    }
+  });
+
   const httpServer = createServer(app);
 
   // WebSocket setup

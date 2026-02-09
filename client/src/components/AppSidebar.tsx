@@ -13,12 +13,6 @@ import {
 import { 
   Home, 
   Ticket, 
-  Map, 
-  Bell, 
-  Car, 
-  BarChart3, 
-  Users, 
-  Settings,
   Gauge
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
@@ -33,25 +27,13 @@ interface AppSidebarProps {
 
 const roleMenus = {
   spectator: [
-    { title: "My Ticket", url: "/", icon: Ticket },
-    { title: "Venue Map", url: "/map", icon: Map },
-    { title: "Notifications", url: "/notifications", icon: Bell },
+    { title: "Dashboard", url: "/", icon: Ticket },
   ],
   staff: [
     { title: "Dashboard", url: "/", icon: Home },
-    { title: "Scan Tickets", url: "/scan", icon: Ticket },
-    { title: "Venue Map", url: "/map", icon: Map },
-    { title: "Crowd Monitor", url: "/crowd", icon: Users },
-    { title: "Notifications", url: "/notifications", icon: Bell },
   ],
   organizer: [
     { title: "Dashboard", url: "/", icon: Gauge },
-    { title: "Analytics", url: "/analytics", icon: BarChart3 },
-    { title: "Venue Map", url: "/map", icon: Map },
-    { title: "Parking", url: "/parking", icon: Car },
-    { title: "Crowd Flow", url: "/crowd", icon: Users },
-    { title: "Notifications", url: "/notifications", icon: Bell },
-    { title: "Settings", url: "/settings", icon: Settings },
   ],
 };
 
