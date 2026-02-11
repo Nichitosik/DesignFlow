@@ -5,10 +5,15 @@ import { Users, Ticket, TrendingUp, AlertTriangle, Database } from "lucide-react
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useI18n } from "@/lib/i18n";
+import { useEventWebSocket } from "@/hooks/use-websocket";
 
 export default function OrganizerOverview() {
+  const { t } = useI18n();
   const { data: events, isLoading } = useQuery<any[]>({ queryKey: ["/api/events"] });
   const activeEvent = events?.find((e: any) => e.status === "active") || events?.[0];
+
+  useEventWebSocket(activeEvent?.id, "organizer");
 
   const { data: stats } = useQuery<any>({
     queryKey: ["/api/events", activeEvent?.id, "stats"],
@@ -68,7 +73,7 @@ export default function OrganizerOverview() {
   return (
     <div className="p-6 space-y-6">
       <div>
-        <h1 className="text-2xl font-bold" data-testid="text-organizer-title">Overview</h1>
+        <h1 className="text-2xl font-bold" data-testid="text-organizer-title">{t("overview.title")}</h1>
         <p className="text-muted-foreground text-sm">{activeEvent.name} - Real-time event monitoring</p>
       </div>
 

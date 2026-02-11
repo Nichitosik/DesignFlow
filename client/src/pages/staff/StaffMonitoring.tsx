@@ -9,12 +9,17 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useI18n } from "@/lib/i18n";
+import { useEventWebSocket } from "@/hooks/use-websocket";
 
 export default function StaffMonitoring() {
+  const { t } = useI18n();
   const [liveEntries, setLiveEntries] = useState<{ time: string; count: number; type: "entry" | "exit" }[]>([]);
 
   const { data: events, isLoading } = useQuery<any[]>({ queryKey: ["/api/events"] });
   const activeEvent = events?.find((e: any) => e.status === "active") || events?.[0];
+
+  useEventWebSocket(activeEvent?.id, "staff");
 
   const { data: stats } = useQuery<any>({
     queryKey: ["/api/events", activeEvent?.id, "stats"],
@@ -83,7 +88,7 @@ export default function StaffMonitoring() {
   return (
     <div className="p-6 space-y-6 max-w-5xl mx-auto">
       <div>
-        <h1 className="text-2xl font-bold" data-testid="text-monitoring-title">Live Monitoring</h1>
+        <h1 className="text-2xl font-bold" data-testid="text-monitoring-title">{t("monitoring.title")}</h1>
         <p className="text-muted-foreground text-sm">Real-time event operations dashboard</p>
       </div>
 

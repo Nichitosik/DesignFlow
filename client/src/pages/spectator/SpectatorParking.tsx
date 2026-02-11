@@ -6,12 +6,17 @@ import { useState, useEffect, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useI18n } from "@/lib/i18n";
+import { useEventWebSocket } from "@/hooks/use-websocket";
 
 export default function SpectatorParking() {
+  const { t } = useI18n();
   const [simulatedParking, setSimulatedParking] = useState<any[] | null>(null);
 
   const { data: events, isLoading } = useQuery<any[]>({ queryKey: ["/api/events"] });
   const activeEvent = events?.find((e: any) => e.status === "active") || events?.[0];
+
+  useEventWebSocket(activeEvent?.id, "spectator");
 
   const { data: parking } = useQuery<any[]>({
     queryKey: ["/api/events", activeEvent?.id, "parking"],
@@ -80,7 +85,7 @@ export default function SpectatorParking() {
   return (
     <div className="p-6 space-y-6 max-w-4xl mx-auto">
       <div>
-        <h1 className="text-2xl font-bold" data-testid="text-parking-title">Parking Availability</h1>
+        <h1 className="text-2xl font-bold" data-testid="text-parking-title">{t("parking.title")}</h1>
         <p className="text-muted-foreground text-sm">Live parking status for {activeEvent.name}</p>
       </div>
 

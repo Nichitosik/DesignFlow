@@ -7,6 +7,8 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useI18n } from "@/lib/i18n";
+import { useEventWebSocket } from "@/hooks/use-websocket";
 
 interface TimePoint {
   time: string;
@@ -16,11 +18,14 @@ interface TimePoint {
 }
 
 export default function OrganizerAnalytics() {
+  const { t } = useI18n();
   const [timeData, setTimeData] = useState<TimePoint[]>([]);
   const [peakEntry, setPeakEntry] = useState(0);
 
   const { data: events, isLoading } = useQuery<any[]>({ queryKey: ["/api/events"] });
   const activeEvent = events?.find((e: any) => e.status === "active") || events?.[0];
+
+  useEventWebSocket(activeEvent?.id, "organizer");
 
   const { data: stats } = useQuery<any>({
     queryKey: ["/api/events", activeEvent?.id, "stats"],
@@ -91,7 +96,7 @@ export default function OrganizerAnalytics() {
   return (
     <div className="p-6 space-y-6">
       <div>
-        <h1 className="text-2xl font-bold" data-testid="text-analytics-title">Analytics</h1>
+        <h1 className="text-2xl font-bold" data-testid="text-analytics-title">{t("analytics.title")}</h1>
         <p className="text-muted-foreground text-sm">Real-time event performance metrics</p>
       </div>
 

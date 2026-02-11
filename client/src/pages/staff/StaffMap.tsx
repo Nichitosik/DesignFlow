@@ -6,8 +6,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Database } from "lucide-react";
+import { useI18n } from "@/lib/i18n";
 
 export default function StaffMap() {
+  const { t } = useI18n();
   const [activeZone, setActiveZone] = useState<string>();
 
   const { data: events, isLoading } = useQuery<any[]>({ queryKey: ["/api/events"] });
@@ -58,7 +60,7 @@ export default function StaffMap() {
   return (
     <div className="p-6 space-y-4 max-w-5xl mx-auto">
       <div>
-        <h1 className="text-2xl font-bold" data-testid="text-staff-map-title">Venue Map</h1>
+        <h1 className="text-2xl font-bold" data-testid="text-staff-map-title">{t("map.title")}</h1>
         <p className="text-muted-foreground text-sm">{activeEvent.name} - Live zone occupancy (auto-refresh)</p>
       </div>
       {zonesLoading ? <Skeleton className="h-[500px]" /> : (

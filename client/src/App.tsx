@@ -7,6 +7,8 @@ import { ThemeProvider } from "@/components/ThemeProvider";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
+import { I18nProvider, useI18n } from "@/lib/i18n";
+import { LanguageSelector } from "@/components/LanguageSelector";
 import RoleSelector from "@/pages/RoleSelector";
 import NotFound from "@/pages/not-found";
 import { useAuth } from "@/hooks/use-auth";
@@ -42,22 +44,27 @@ function PageLoader() {
 }
 
 function LandingPage() {
+  const { t } = useI18n();
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-primary/10 via-background to-chart-2/10">
+      <div className="absolute top-4 right-4 flex items-center gap-2">
+        <LanguageSelector />
+        <ThemeToggle />
+      </div>
       <Card className="max-w-md w-full">
         <CardHeader className="text-center space-y-4">
           <div className="flex items-center justify-center gap-2">
             <Gauge className="h-10 w-10 text-primary" />
-            <h1 className="text-4xl font-bold">EventFlow</h1>
+            <h1 className="text-4xl font-bold">{t("app.name")}</h1>
           </div>
-          <p className="text-muted-foreground">Entertainment Center Management System</p>
+          <p className="text-muted-foreground">{t("app.tagline")}</p>
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-sm text-center text-muted-foreground">
-            Real-time event monitoring, ticket validation, crowd management, and AI-powered recommendations.
+            {t("common.welcomeDesc")}
           </p>
           <Button className="w-full" onClick={() => window.location.href = "/api/login"} data-testid="button-login">
-            Log In to Continue
+            {t("common.login")}
           </Button>
         </CardContent>
       </Card>
@@ -134,6 +141,7 @@ function AuthenticatedApp() {
           <header className="flex items-center justify-between p-4 border-b">
             <SidebarTrigger data-testid="button-sidebar-toggle" />
             <div className="flex items-center gap-2">
+              <LanguageSelector />
               <ThemeToggle />
               <Button
                 variant="outline"
@@ -205,10 +213,12 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
-        <TooltipProvider>
-          <Router />
-          <Toaster />
-        </TooltipProvider>
+        <I18nProvider>
+          <TooltipProvider>
+            <Router />
+            <Toaster />
+          </TooltipProvider>
+        </I18nProvider>
       </ThemeProvider>
     </QueryClientProvider>
   );

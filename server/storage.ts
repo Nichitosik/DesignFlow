@@ -1,7 +1,7 @@
 import { db } from "./db";
 import { eq, and, desc, sql } from "drizzle-orm";
 import {
-  events, tickets, venueZones, parkingLots, notifications, aiRecommendations, userRoles,
+  events, tickets, venueZones, parkingLots, notifications, aiRecommendations, userRoles, venues, ticketCategories,
   type Event, type InsertEvent,
   type Ticket, type InsertTicket,
   type VenueZone, type InsertVenueZone,
@@ -9,6 +9,8 @@ import {
   type Notification, type InsertNotification,
   type AiRecommendation, type InsertAiRecommendation,
   type UserRole, type InsertUserRole,
+  type Venue, type InsertVenue,
+  type TicketCategory, type InsertTicketCategory,
 } from "@shared/schema";
 import { users, type User, type UpsertUser } from "@shared/models/auth";
 
@@ -19,12 +21,22 @@ export interface IStorage {
   updateEvent(id: number, data: Partial<InsertEvent>): Promise<Event | undefined>;
   getActiveEvents(): Promise<Event[]>;
 
+  getVenues(): Promise<Venue[]>;
+  getVenue(id: number): Promise<Venue | undefined>;
+  createVenue(venue: InsertVenue): Promise<Venue>;
+  updateVenue(id: number, data: Partial<InsertVenue>): Promise<Venue | undefined>;
+
+  getTicketCategoriesByEvent(eventId: number): Promise<TicketCategory[]>;
+  createTicketCategory(cat: InsertTicketCategory): Promise<TicketCategory>;
+  updateTicketCategorySold(id: number, sold: number): Promise<TicketCategory | undefined>;
+
   getTicketsByEvent(eventId: number): Promise<Ticket[]>;
   getTicketsByUser(userId: string): Promise<Ticket[]>;
   getTicket(id: number): Promise<Ticket | undefined>;
   getTicketByCode(code: string): Promise<Ticket | undefined>;
   createTicket(ticket: InsertTicket): Promise<Ticket>;
   updateTicketStatus(id: number, status: string, scannedBy?: string): Promise<Ticket | undefined>;
+  upgradeTicket(id: number, newCategory: string, newPrice: number): Promise<Ticket | undefined>;
   getTicketStats(eventId: number): Promise<{ total: number; valid: number; used: number; invalid: number; pending: number }>;
 
   getZonesByEvent(eventId: number): Promise<VenueZone[]>;
@@ -74,6 +86,39 @@ class DatabaseStorage implements IStorage {
     return db.select().from(events).where(eq(events.status, "active")).orderBy(desc(events.date));
   }
 
+  async getVenues(): Promise<Venue[]> {
+    return db.select().from(venues);
+  }
+
+  async getVenue(id: number): Promise<Venue | undefined> {
+    const [venue] = await db.select().from(venues).where(eq(venues.id, id));
+    return venue;
+  }
+
+  async createVenue(venue: InsertVenue): Promise<Venue> {
+    const [created] = await db.insert(venues).values(venue as any).returning();
+    return created;
+  }
+
+  async updateVenue(id: number, data: Partial<InsertVenue>): Promise<Venue | undefined> {
+    const [updated] = await db.update(venues).set(data as any).where(eq(venues.id, id)).returning();
+    return updated;
+  }
+
+  async getTicketCategoriesByEvent(eventId: number): Promise<TicketCategory[]> {
+    return db.select().from(ticketCategories).where(eq(ticketCategories.eventId, eventId));
+  }
+
+  async createTicketCategory(cat: InsertTicketCategory): Promise<TicketCategory> {
+    const [created] = await db.insert(ticketCategories).values(cat as any).returning();
+    return created;
+  }
+
+  async updateTicketCategorySold(id: number, sold: number): Promise<TicketCategory | undefined> {
+    const [updated] = await db.update(ticketCategories).set({ sold }).where(eq(ticketCategories.id, id)).returning();
+    return updated;
+  }
+
   async getTicketsByEvent(eventId: number): Promise<Ticket[]> {
     return db.select().from(tickets).where(eq(tickets.eventId, eventId));
   }
@@ -101,6 +146,14 @@ class DatabaseStorage implements IStorage {
     const updateData: any = { status, scannedAt: new Date() };
     if (scannedBy) updateData.scannedBy = scannedBy;
     const [updated] = await db.update(tickets).set(updateData).where(eq(tickets.id, id)).returning();
+    return updated;
+  }
+
+  async upgradeTicket(id: number, newCategory: string, newPrice: number): Promise<Ticket | undefined> {
+    const [updated] = await db.update(tickets)
+      .set({ category: newCategory, price: newPrice } as any)
+      .where(eq(tickets.id, id))
+      .returning();
     return updated;
   }
 

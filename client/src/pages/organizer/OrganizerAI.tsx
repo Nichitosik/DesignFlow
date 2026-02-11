@@ -6,6 +6,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
+import { useI18n } from "@/lib/i18n";
 
 const recTypeConfig: Record<string, { icon: any; color: string; label: string }> = {
   crowd_flow: { icon: Users, color: "hsl(260 80% 50%)", label: "Crowd Flow" },
@@ -16,6 +17,7 @@ const recTypeConfig: Record<string, { icon: any; color: string; label: string }>
 };
 
 export default function OrganizerAI() {
+  const { t } = useI18n();
   const { toast } = useToast();
 
   const { data: events, isLoading } = useQuery<any[]>({ queryKey: ["/api/events"] });
@@ -90,7 +92,7 @@ export default function OrganizerAI() {
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
-          <h1 className="text-2xl font-bold" data-testid="text-ai-title">AI Insights</h1>
+          <h1 className="text-2xl font-bold" data-testid="text-ai-title">{t("ai.title")}</h1>
           <p className="text-muted-foreground text-sm">GPT-5 powered crowd flow optimization</p>
         </div>
         <Button

@@ -7,8 +7,10 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Database } from "lucide-react";
 import { CapacityMeter } from "@/components/CapacityMeter";
+import { useI18n } from "@/lib/i18n";
 
 export default function OrganizerMap() {
+  const { t } = useI18n();
   const [activeZone, setActiveZone] = useState<string>();
 
   const { data: events, isLoading } = useQuery<any[]>({ queryKey: ["/api/events"] });
@@ -58,7 +60,7 @@ export default function OrganizerMap() {
   return (
     <div className="p-6 space-y-6">
       <div>
-        <h1 className="text-2xl font-bold" data-testid="text-org-map-title">Venue Map</h1>
+        <h1 className="text-2xl font-bold" data-testid="text-org-map-title">{t("map.title")}</h1>
         <p className="text-muted-foreground text-sm">{activeEvent.name} - Interactive zone management</p>
       </div>
 

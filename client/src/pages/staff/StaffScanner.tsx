@@ -9,6 +9,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
+import { useI18n } from "@/lib/i18n";
 
 interface ScanResult {
   status: "valid" | "already_used" | "invalid" | null;
@@ -28,6 +29,7 @@ interface DemoTicket {
 }
 
 export default function StaffScanner() {
+  const { t } = useI18n();
   const [scanCode, setScanCode] = useState("");
   const [scanHistory, setScanHistory] = useState<ScanResult[]>([]);
   const [lastScanResult, setLastScanResult] = useState<ScanResult | null>(null);
@@ -186,7 +188,7 @@ export default function StaffScanner() {
     <div className="p-6 space-y-6 max-w-3xl mx-auto">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
-          <h1 className="text-2xl font-bold" data-testid="text-scanner-title">Ticket Scanner</h1>
+          <h1 className="text-2xl font-bold" data-testid="text-scanner-title">{t("scanner.title")}</h1>
           <p className="text-muted-foreground text-sm">Scan and validate event tickets</p>
         </div>
         <div className="flex items-center gap-2">

@@ -1,0 +1,34 @@
+Create a mobile and web application for event management, similar to afișa.md, but with extended functionalities for spectators, staff, and organizers. The application should include the following modules and features:
+Maps and Navigation (Google Maps Integration)
+Display the event location on the map (e.g., Chișinău Arena, Teatrul Verde).
+Ability to add new locations for future events.
+Navigation to the location for spectators and staff, with options: walking, driving, and public transport.
+Public transport directions: routes, buses, trolleybuses, from all sectors and suburbs.
+Login and Accounts System
+Individual accounts for spectators.
+Shared account for all event staff.
+Shared account for organizers.
+Access control for functionalities based on account type.
+Secure login (e.g., email, social login, unique code for spectators).
+Tickets and Live Management
+Each event should have its own set of tickets.
+Spectators can see real-time ticket availability and pricing.
+Spectators can change ticket status (e.g., Main → Tribuna → VIP), with automatic display of the price difference to be paid.
+Any ticket status change made by spectators is instantly synchronized and visible to staff and organizers.
+Generation of a unique code for each online ticket, preventing theft or duplication.
+Push notifications to spectators and staff regarding changes, crowding, or other important events.
+Vehicle Flow and Parking
+Real-time monitoring of vehicle flow in parking areas.
+Alert organizers and staff when parking reaches capacity.
+Spectators can see live availability of parking spaces.
+Artificial Intelligence and IoT
+AI recommendations for optimizing spectator flow and preventing bottlenecks.
+Possibility of integration with IoT systems for real-time monitoring (tickets, vehicle flow, crowding).
+Language Support
+Option to switch the application language between Romanian, English, and Russian.
+All modules, notifications, and content must update instantly according to the selected language.
+Extensibility and Scalability
+Ability to add new locations, events, and transportation methods without major code changes.
+Modular interface, easy to extend and maintain.
+Technical Requirements:
+The application must be scalable, secure, user-friendly, and ready for nationwide launch. All live changes must be synchronized for spectators, staff, and organizers. There should be clear documentation for implementing all functionalities, language support, and AI/IoT integration.

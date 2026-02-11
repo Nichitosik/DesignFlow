@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { MapPin, Clock, ArrowRight, Navigation, Car, Footprints, Bus, Search } from "lucide-react";
 import { useState, useMemo } from "react";
+import { useI18n } from "@/lib/i18n";
 
 type TransportMode = "car" | "walk" | "transit";
 
@@ -203,6 +204,7 @@ const modeConfig: Record<TransportMode, { icon: any; label: string; color: strin
 };
 
 export default function SpectatorDirections() {
+  const { t } = useI18n();
   const [expandedRoute, setExpandedRoute] = useState<string | null>(null);
   const [selectedMode, setSelectedMode] = useState<TransportMode>("car");
   const [searchQuery, setSearchQuery] = useState("");
@@ -218,7 +220,7 @@ export default function SpectatorDirections() {
   return (
     <div className="p-6 space-y-6 max-w-4xl mx-auto">
       <div>
-        <h1 className="text-2xl font-bold" data-testid="text-directions-title">Directions to Venue</h1>
+        <h1 className="text-2xl font-bold" data-testid="text-directions-title">{t("directions.title")}</h1>
         <p className="text-muted-foreground text-sm">Find the best route from your location</p>
       </div>
 
@@ -227,7 +229,7 @@ export default function SpectatorDirections() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             className="pl-9"
-            placeholder="Search locations..."
+            placeholder={t("directions.searchPlaceholder")}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             data-testid="input-search-location"

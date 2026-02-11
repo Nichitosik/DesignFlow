@@ -11,7 +11,6 @@ import {
   SidebarFooter,
 } from "@/components/ui/sidebar";
 import { 
-  Home, 
   Ticket, 
   Gauge,
   Map,
@@ -21,11 +20,11 @@ import {
   ScanLine,
   Activity,
   Navigation,
-  Eye,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { useI18n } from "@/lib/i18n";
 
 type UserRole = "spectator" | "staff" | "organizer";
 
@@ -34,24 +33,24 @@ interface AppSidebarProps {
   userName?: string;
 }
 
-const roleMenus: Record<UserRole, { title: string; url: string; icon: any }[]> = {
+const roleMenuDefs: Record<UserRole, { titleKey: string; url: string; icon: any; testId: string }[]> = {
   spectator: [
-    { title: "My Tickets", url: "/spectator/tickets", icon: Ticket },
-    { title: "Venue Map", url: "/spectator/map", icon: Map },
-    { title: "Directions", url: "/spectator/directions", icon: Navigation },
-    { title: "Parking", url: "/spectator/parking", icon: Car },
+    { titleKey: "nav.myTickets", url: "/spectator/tickets", icon: Ticket, testId: "link-my-tickets" },
+    { titleKey: "nav.venueMap", url: "/spectator/map", icon: Map, testId: "link-venue-map" },
+    { titleKey: "nav.directions", url: "/spectator/directions", icon: Navigation, testId: "link-directions" },
+    { titleKey: "nav.parking", url: "/spectator/parking", icon: Car, testId: "link-parking" },
   ],
   staff: [
-    { title: "Scanner", url: "/staff/scanner", icon: ScanLine },
-    { title: "Monitoring", url: "/staff/monitoring", icon: Activity },
-    { title: "Venue Map", url: "/staff/map", icon: Map },
+    { titleKey: "nav.scanner", url: "/staff/scanner", icon: ScanLine, testId: "link-scanner" },
+    { titleKey: "nav.monitoring", url: "/staff/monitoring", icon: Activity, testId: "link-monitoring" },
+    { titleKey: "nav.venueMap", url: "/staff/map", icon: Map, testId: "link-venue-map" },
   ],
   organizer: [
-    { title: "Overview", url: "/organizer/overview", icon: Gauge },
-    { title: "Venue Map", url: "/organizer/map", icon: Map },
-    { title: "Parking", url: "/organizer/parking", icon: Car },
-    { title: "Analytics", url: "/organizer/analytics", icon: BarChart3 },
-    { title: "AI Insights", url: "/organizer/ai", icon: Brain },
+    { titleKey: "nav.overview", url: "/organizer/overview", icon: Gauge, testId: "link-overview" },
+    { titleKey: "nav.venueMap", url: "/organizer/map", icon: Map, testId: "link-venue-map" },
+    { titleKey: "nav.parking", url: "/organizer/parking", icon: Car, testId: "link-parking" },
+    { titleKey: "nav.analytics", url: "/organizer/analytics", icon: BarChart3, testId: "link-analytics" },
+    { titleKey: "nav.aiInsights", url: "/organizer/ai", icon: Brain, testId: "link-ai-insights" },
   ],
 };
 
@@ -63,15 +62,10 @@ const roleBadgeColors: Record<UserRole, string> = {
 
 export function AppSidebar({ role, userName = "User" }: AppSidebarProps) {
   const [location] = useLocation();
-  const menuItems = roleMenus[role];
+  const { t } = useI18n();
+  const menuItems = roleMenuDefs[role];
 
-  const getRoleBadge = () => {
-    switch (role) {
-      case "spectator": return "Spectator";
-      case "staff": return "Staff";
-      case "organizer": return "Organizer";
-    }
-  };
+  const roleLabel = t(`role.${role}`);
 
   const isActive = (url: string) => {
     return location === url || (location === "/" && url === menuItems[0].url);
@@ -82,27 +76,27 @@ export function AppSidebar({ role, userName = "User" }: AppSidebarProps) {
       <SidebarHeader className="p-4">
         <div className="flex items-center gap-2">
           <Gauge className="h-6 w-6 text-primary" />
-          <span className="font-bold text-lg">EventFlow</span>
+          <span className="font-bold text-lg">{t("app.name")}</span>
         </div>
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupLabel className="flex items-center justify-between gap-2">
             <span>Navigation</span>
-            <Badge className={`text-[10px] ${roleBadgeColors[role]}`}>{getRoleBadge()}</Badge>
+            <Badge className={`text-[10px] ${roleBadgeColors[role]}`}>{roleLabel}</Badge>
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {menuItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
+                <SidebarMenuItem key={item.url}>
                   <SidebarMenuButton
                     asChild
                     isActive={isActive(item.url)}
-                    data-testid={`link-${item.title.toLowerCase().replace(/\s/g, '-')}`}
+                    data-testid={item.testId}
                   >
                     <Link href={item.url}>
                       <item.icon />
-                      <span>{item.title}</span>
+                      <span>{t(item.titleKey)}</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -120,7 +114,7 @@ export function AppSidebar({ role, userName = "User" }: AppSidebarProps) {
           </Avatar>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium truncate">{userName}</p>
-            <p className="text-xs text-muted-foreground">{getRoleBadge()}</p>
+            <p className="text-xs text-muted-foreground">{roleLabel}</p>
           </div>
         </div>
       </SidebarFooter>

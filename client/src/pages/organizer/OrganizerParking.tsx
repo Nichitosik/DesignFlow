@@ -7,8 +7,10 @@ import { useState, useEffect, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useI18n } from "@/lib/i18n";
 
 export default function OrganizerParking() {
+  const { t } = useI18n();
   const [simulatedParking, setSimulatedParking] = useState<any[] | null>(null);
 
   const { data: events, isLoading } = useQuery<any[]>({ queryKey: ["/api/events"] });
@@ -88,7 +90,7 @@ export default function OrganizerParking() {
   return (
     <div className="p-6 space-y-6">
       <div>
-        <h1 className="text-2xl font-bold" data-testid="text-org-parking-title">Parking Management</h1>
+        <h1 className="text-2xl font-bold" data-testid="text-org-parking-title">{t("parking.title")}</h1>
         <p className="text-muted-foreground text-sm">Live parking capacity monitoring</p>
       </div>
 

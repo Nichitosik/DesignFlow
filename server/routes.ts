@@ -12,6 +12,8 @@ import {
   insertParkingLotSchema,
   insertNotificationSchema,
   insertUserRoleSchema,
+  insertVenueSchema,
+  insertTicketCategorySchema,
 } from "@shared/schema";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -95,6 +97,82 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Venues
+  app.get("/api/venues", async (_req, res) => {
+    try {
+      const allVenues = await storage.getVenues();
+      res.json(allVenues);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch venues" });
+    }
+  });
+
+  app.post("/api/venues", isAuthenticated, requireRole("organizer"), async (req, res) => {
+    try {
+      const parsed = insertVenueSchema.parse(req.body);
+      const venue = await storage.createVenue(parsed);
+      res.status(201).json(venue);
+    } catch (error: any) {
+      if (error.name === "ZodError") return res.status(400).json({ message: "Validation error", errors: error.errors });
+      res.status(500).json({ message: "Failed to create venue" });
+    }
+  });
+
+  app.patch("/api/venues/:id", isAuthenticated, requireRole("organizer"), async (req, res) => {
+    try {
+      const venue = await storage.updateVenue(Number(req.params.id), req.body);
+      if (!venue) return res.status(404).json({ message: "Venue not found" });
+      res.json(venue);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update venue" });
+    }
+  });
+
+  // Ticket Categories
+  app.get("/api/events/:eventId/ticket-categories", async (req, res) => {
+    try {
+      const cats = await storage.getTicketCategoriesByEvent(Number(req.params.eventId));
+      res.json(cats);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch ticket categories" });
+    }
+  });
+
+  app.post("/api/events/:eventId/ticket-categories", isAuthenticated, requireRole("organizer"), async (req, res) => {
+    try {
+      const parsed = insertTicketCategorySchema.parse({
+        ...req.body,
+        eventId: Number(req.params.eventId),
+      });
+      const cat = await storage.createTicketCategory(parsed);
+      broadcast(cat.eventId, { type: "ticket_category_update", data: cat });
+      res.status(201).json(cat);
+    } catch (error: any) {
+      if (error.name === "ZodError") return res.status(400).json({ message: "Validation error", errors: error.errors });
+      res.status(500).json({ message: "Failed to create ticket category" });
+    }
+  });
+
+  // Ticket Availability (public)
+  app.get("/api/events/:eventId/ticket-availability", async (req, res) => {
+    try {
+      const eventId = Number(req.params.eventId);
+      const cats = await storage.getTicketCategoriesByEvent(eventId);
+      const availability = cats.map(cat => ({
+        id: cat.id,
+        name: cat.name,
+        price: cat.price,
+        capacity: cat.capacity,
+        sold: cat.sold || 0,
+        available: cat.capacity - (cat.sold || 0),
+        color: cat.color,
+      }));
+      res.json(availability);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch ticket availability" });
+    }
+  });
+
   // Tickets
   app.get("/api/events/:eventId/tickets", isAuthenticated, async (req, res) => {
     try {
@@ -152,6 +230,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(updated);
     } catch (error) {
       res.status(500).json({ message: "Failed to scan ticket" });
+    }
+  });
+
+  // Ticket Upgrade
+  app.post("/api/tickets/:id/upgrade", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const ticketId = Number(req.params.id);
+      const { newCategory } = req.body;
+
+      const ticket = await storage.getTicket(ticketId);
+      if (!ticket) return res.status(404).json({ message: "Ticket not found" });
+      if (ticket.userId !== userId) return res.status(403).json({ message: "Not your ticket" });
+      if (ticket.status !== "valid" && ticket.status !== "pending") {
+        return res.status(400).json({ message: "Only valid or pending tickets can be upgraded" });
+      }
+
+      const cats = await storage.getTicketCategoriesByEvent(ticket.eventId);
+      const oldCat = cats.find(c => c.name === ticket.category);
+      const newCat = cats.find(c => c.name === newCategory);
+
+      if (!newCat) return res.status(400).json({ message: "Invalid category" });
+      if (newCat.name === ticket.category) return res.status(400).json({ message: "Already in this category" });
+
+      const available = newCat.capacity - (newCat.sold || 0);
+      if (available <= 0) return res.status(400).json({ message: "No tickets available in this category" });
+
+      const oldPrice = oldCat ? oldCat.price : (ticket.price || 0);
+      const priceDifference = newCat.price - oldPrice;
+
+      const upgraded = await storage.upgradeTicket(ticketId, newCategory, newCat.price);
+
+      if (oldCat) {
+        await storage.updateTicketCategorySold(oldCat.id, Math.max(0, (oldCat.sold || 0) - 1));
+      }
+      await storage.updateTicketCategorySold(newCat.id, (newCat.sold || 0) + 1);
+
+      if (upgraded) {
+        broadcast(ticket.eventId, {
+          type: "ticket_upgraded",
+          data: { ticket: upgraded, oldCategory: ticket.category, newCategory, priceDifference },
+        });
+      }
+
+      res.json({ ticket: upgraded, priceDifference });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to upgrade ticket" });
     }
   });
 
@@ -461,16 +586,36 @@ Provide 2-4 recommendations as a JSON object with this structure:
 
       await storage.setUserRole({ userId, role: "organizer" });
 
+      const venue = await storage.createVenue({
+        name: "Chișinău Arena",
+        address: "Strada Independenței 12",
+        city: "Chișinău",
+        country: "Moldova",
+        latitude: 47.0245,
+        longitude: 28.8322,
+      });
+
       const event = await storage.createEvent({
         name: "Summer Music Festival 2025",
         description: "The biggest summer music event featuring top artists from around the world.",
         date: new Date("2025-08-15"),
         startTime: "18:00",
         endTime: "23:00",
-        venue: "Arena Nationala, Bucharest",
+        venue: "Chișinău Arena",
+        venueId: venue.id,
         status: "active",
         createdBy: userId,
         maxCapacity: 10000,
+      });
+
+      const catMain = await storage.createTicketCategory({
+        eventId: event.id, name: "Main", price: 50, capacity: 5000, color: "#6366f1",
+      });
+      const catTribuna = await storage.createTicketCategory({
+        eventId: event.id, name: "Tribuna", price: 120, capacity: 2000, color: "#f59e0b",
+      });
+      const catVip = await storage.createTicketCategory({
+        eventId: event.id, name: "VIP", price: 250, capacity: 500, color: "#ef4444",
       });
 
       const zoneData = [
@@ -496,8 +641,12 @@ Provide 2-4 recommendations as a JSON object with this structure:
         userId,
         zone: "VIP Zone A",
         seat: "Row 5, Seat 12",
+        category: "Main",
+        price: 50,
         status: "valid",
       });
+
+      await storage.updateTicketCategorySold(catMain.id, 1);
 
       await storage.createNotification({
         eventId: event.id, type: "info", title: "Gates Opening Soon",
@@ -508,7 +657,7 @@ Provide 2-4 recommendations as a JSON object with this structure:
         message: "Parking Lot B has plenty of available spaces.",
       });
 
-      res.json({ event, ticket });
+      res.json({ event, ticket, venue });
     } catch (error: any) {
       console.error("Seed error:", error);
       res.status(500).json({ message: "Failed to seed data", error: error.message });

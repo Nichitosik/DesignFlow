@@ -2,12 +2,21 @@ import { TicketCard } from "@/components/TicketCard";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Database, Ticket, QrCode, Play, RotateCcw, ArrowRight } from "lucide-react";
+import { Database, Ticket, QrCode, Play, RotateCcw, ArrowRight, ArrowUpCircle, Tag, Users } from "lucide-react";
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
+import { useEventWebSocket } from "@/hooks/use-websocket";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from "@/components/ui/dialog";
 
 interface DemoTicket {
   id: string;
@@ -15,12 +24,27 @@ interface DemoTicket {
   status: "pending" | "valid" | "used" | "invalid";
   zone: string;
   seat: string;
+  category: string;
+  price: number;
   history: { status: string; time: string }[];
+}
+
+interface TicketAvailability {
+  id: number;
+  name: string;
+  price: number;
+  capacity: number;
+  sold: number;
+  available: number;
+  color: string;
 }
 
 export default function SpectatorTickets() {
   const [demoMode, setDemoMode] = useState(false);
   const [demoTickets, setDemoTickets] = useState<DemoTicket[]>([]);
+  const [upgradeDialogOpen, setUpgradeDialogOpen] = useState(false);
+  const [selectedTicket, setSelectedTicket] = useState<any>(null);
+  const [selectedCategory, setSelectedCategory] = useState<string>("");
   const { toast } = useToast();
 
   const { data: events, isLoading: eventsLoading } = useQuery<any[]>({
@@ -29,8 +53,17 @@ export default function SpectatorTickets() {
 
   const activeEvent = events?.find((e: any) => e.status === "active") || events?.[0];
 
+  useEventWebSocket(activeEvent?.id, "spectator");
+
   const { data: myTickets, isLoading: ticketsLoading } = useQuery<any[]>({
     queryKey: ["/api/tickets/my"],
+  });
+
+  const { data: availability } = useQuery<TicketAvailability[]>({
+    queryKey: ["/api/events", activeEvent?.id, "ticket-availability"],
+    queryFn: () => fetch(`/api/events/${activeEvent?.id}/ticket-availability`).then(r => r.json()),
+    enabled: !!activeEvent?.id,
+    refetchInterval: 10000,
   });
 
   const seedMutation = useMutation({
@@ -41,14 +74,41 @@ export default function SpectatorTickets() {
     },
   });
 
+  const upgradeMutation = useMutation({
+    mutationFn: ({ ticketId, newCategory }: { ticketId: number; newCategory: string }) =>
+      apiRequest("POST", `/api/tickets/${ticketId}/upgrade`, { newCategory }),
+    onSuccess: async (res) => {
+      const data = await res.json();
+      const diff = data.priceDifference;
+      queryClient.invalidateQueries({ queryKey: ["/api/tickets/my"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/events", activeEvent?.id, "ticket-availability"] });
+      setUpgradeDialogOpen(false);
+      toast({
+        title: "Ticket Upgraded",
+        description: `Upgraded to ${selectedCategory}. ${diff > 0 ? `Price difference: +${diff.toFixed(2)} MDL` : ""}`,
+      });
+    },
+    onError: () => {
+      toast({ title: "Upgrade Failed", description: "Could not upgrade ticket. Please try again.", variant: "destructive" });
+    },
+  });
+
   const generateDemoTickets = () => {
     const zones = ["VIP Zone A", "General 1", "General 2", "Balcony"];
+    const categories: Array<{ name: string; price: number }> = [
+      { name: "Main", price: 50 },
+      { name: "Main", price: 50 },
+      { name: "Tribuna", price: 120 },
+      { name: "Main", price: 50 },
+    ];
     const tickets: DemoTicket[] = Array.from({ length: 4 }, (_, i) => ({
       id: `demo-${Date.now()}-${i}`,
       code: `DEMO-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
       status: "pending" as const,
       zone: zones[i % zones.length],
       seat: `Row ${Math.floor(Math.random() * 20) + 1}, Seat ${Math.floor(Math.random() * 30) + 1}`,
+      category: categories[i].name,
+      price: categories[i].price,
       history: [{ status: "pending", time: new Date().toLocaleTimeString() }],
     }));
     setDemoTickets(tickets);
@@ -85,6 +145,20 @@ export default function SpectatorTickets() {
     }
   };
 
+  const openUpgradeDialog = (ticket: any) => {
+    setSelectedTicket(ticket);
+    setSelectedCategory("");
+    setUpgradeDialogOpen(true);
+  };
+
+  const getUpgradePriceDifference = () => {
+    if (!selectedTicket || !selectedCategory || !availability) return 0;
+    const currentCat = availability.find(a => a.name === selectedTicket.category);
+    const newCat = availability.find(a => a.name === selectedCategory);
+    if (!currentCat || !newCat) return 0;
+    return newCat.price - currentCat.price;
+  };
+
   if (eventsLoading) {
     return (
       <div className="p-6 space-y-6 max-w-4xl mx-auto">
@@ -114,6 +188,7 @@ export default function SpectatorTickets() {
   }
 
   const eventDate = activeEvent.date ? new Date(activeEvent.date).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) : "";
+  const categoryOrder = ["Main", "Tribuna", "VIP"];
 
   return (
     <div className="p-6 space-y-6 max-w-4xl mx-auto">
@@ -137,6 +212,52 @@ export default function SpectatorTickets() {
         </div>
       </div>
 
+      {availability && availability.length > 0 && !demoMode && (
+        <Card data-testid="ticket-availability-panel">
+          <CardHeader className="pb-3">
+            <div className="flex items-center gap-2">
+              <Tag className="h-5 w-5 text-primary" />
+              <div>
+                <h3 className="font-semibold">Ticket Availability</h3>
+                <p className="text-xs text-muted-foreground">Real-time pricing and availability</p>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {[...availability].sort((a, b) => categoryOrder.indexOf(a.name) - categoryOrder.indexOf(b.name)).map((cat) => {
+                const pct = cat.capacity > 0 ? Math.round((cat.sold / cat.capacity) * 100) : 0;
+                return (
+                  <div
+                    key={cat.id}
+                    className="border rounded-md p-4 space-y-2"
+                    data-testid={`availability-card-${cat.name}`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-semibold text-sm" data-testid={`availability-name-${cat.name}`}>{cat.name}</span>
+                      <Badge variant="outline" data-testid={`availability-price-${cat.name}`}>{cat.price.toFixed(0)} MDL</Badge>
+                    </div>
+                    <div className="w-full bg-muted rounded-full h-2">
+                      <div
+                        className="h-2 rounded-full transition-all"
+                        style={{ width: `${pct}%`, backgroundColor: cat.color }}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                      <span className="flex items-center gap-1">
+                        <Users className="h-3 w-3" />
+                        {cat.available} available
+                      </span>
+                      <span>{pct}% sold</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {demoMode && (
         <Card data-testid="demo-tickets-panel">
           <CardHeader className="pb-3">
@@ -156,9 +277,12 @@ export default function SpectatorTickets() {
                     <Ticket className="h-4 w-4 text-muted-foreground" />
                     <span className="font-mono text-sm font-medium">{ticket.code}</span>
                   </div>
-                  <Badge variant="outline" className={statusColor(ticket.status)}>
-                    {ticket.status.toUpperCase()}
-                  </Badge>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary">{ticket.category} - {ticket.price} MDL</Badge>
+                    <Badge variant="outline" className={statusColor(ticket.status)}>
+                      {ticket.status.toUpperCase()}
+                    </Badge>
+                  </div>
                 </div>
                 <div className="text-xs text-muted-foreground flex items-center gap-3 flex-wrap">
                   <span>Zone: {ticket.zone}</span>
@@ -200,16 +324,40 @@ export default function SpectatorTickets() {
             <Skeleton className="h-64" />
           ) : myTickets && myTickets.length > 0 ? (
             myTickets.map((ticket: any) => (
-              <TicketCard
-                key={ticket.id}
-                ticketId={ticket.ticketCode}
-                eventName={activeEvent.name}
-                eventDate={eventDate}
-                eventTime={activeEvent.startTime || ""}
-                zone={ticket.zone}
-                seat={ticket.seat}
-                status={ticket.status === "used" ? "invalid" : ticket.status}
-              />
+              <Card key={ticket.id} data-testid={`ticket-card-${ticket.id}`}>
+                <CardContent className="p-0">
+                  <TicketCard
+                    ticketId={ticket.ticketCode}
+                    eventName={activeEvent.name}
+                    eventDate={eventDate}
+                    eventTime={activeEvent.startTime || ""}
+                    zone={ticket.zone}
+                    seat={ticket.seat}
+                    status={ticket.status === "used" ? "invalid" : ticket.status}
+                  />
+                  <div className="px-4 pb-4 pt-0 flex items-center justify-between gap-2 flex-wrap">
+                    <div className="flex items-center gap-2">
+                      <Badge variant="secondary" data-testid={`ticket-category-${ticket.id}`}>
+                        {ticket.category || "Main"}
+                      </Badge>
+                      <span className="text-sm text-muted-foreground" data-testid={`ticket-price-${ticket.id}`}>
+                        {(ticket.price || 0).toFixed(0)} MDL
+                      </span>
+                    </div>
+                    {(ticket.status === "valid" || ticket.status === "pending") && availability && availability.length > 0 && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => openUpgradeDialog(ticket)}
+                        data-testid={`button-upgrade-${ticket.id}`}
+                      >
+                        <ArrowUpCircle className="h-4 w-4 mr-1" />
+                        Upgrade
+                      </Button>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
             ))
           ) : (
             <Card>
@@ -222,6 +370,81 @@ export default function SpectatorTickets() {
           )}
         </div>
       )}
+
+      <Dialog open={upgradeDialogOpen} onOpenChange={setUpgradeDialogOpen}>
+        <DialogContent data-testid="upgrade-dialog">
+          <DialogHeader>
+            <DialogTitle>Upgrade Ticket</DialogTitle>
+            <DialogDescription>
+              Select a new category for your ticket. The price difference will be shown.
+            </DialogDescription>
+          </DialogHeader>
+          {selectedTicket && availability && (
+            <div className="space-y-4">
+              <div className="text-sm text-muted-foreground">
+                Current: <span className="font-medium text-foreground">{selectedTicket.category || "Main"}</span> ({(selectedTicket.price || 0).toFixed(0)} MDL)
+              </div>
+              <div className="space-y-2">
+                {[...availability]
+                  .sort((a, b) => categoryOrder.indexOf(a.name) - categoryOrder.indexOf(b.name))
+                  .filter(cat => cat.name !== (selectedTicket.category || "Main"))
+                  .map((cat) => {
+                    const diff = cat.price - (selectedTicket.price || 0);
+                    return (
+                      <div
+                        key={cat.id}
+                        className={`border rounded-md p-3 cursor-pointer transition-colors ${selectedCategory === cat.name ? "border-primary bg-primary/5" : "hover-elevate"}`}
+                        onClick={() => setSelectedCategory(cat.name)}
+                        data-testid={`upgrade-option-${cat.name}`}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <div>
+                            <span className="font-medium text-sm">{cat.name}</span>
+                            <span className="text-xs text-muted-foreground ml-2">{cat.available} available</span>
+                          </div>
+                          <div className="text-right">
+                            <div className="font-semibold text-sm">{cat.price.toFixed(0)} MDL</div>
+                            {diff !== 0 && (
+                              <div className={`text-xs ${diff > 0 ? "text-[hsl(0,80%,55%)]" : "text-[hsl(142,70%,45%)]"}`}>
+                                {diff > 0 ? "+" : ""}{diff.toFixed(0)} MDL
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+              {selectedCategory && (
+                <div className="border-t pt-3">
+                  <div className="flex items-center justify-between gap-2 text-sm">
+                    <span className="text-muted-foreground">Price difference</span>
+                    <span className="font-bold">
+                      {getUpgradePriceDifference() > 0 ? "+" : ""}{getUpgradePriceDifference().toFixed(0)} MDL
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setUpgradeDialogOpen(false)} data-testid="button-cancel-upgrade">
+              Cancel
+            </Button>
+            <Button
+              disabled={!selectedCategory || upgradeMutation.isPending}
+              onClick={() => {
+                if (selectedTicket && selectedCategory) {
+                  upgradeMutation.mutate({ ticketId: selectedTicket.id, newCategory: selectedCategory });
+                }
+              }}
+              data-testid="button-confirm-upgrade"
+            >
+              {upgradeMutation.isPending ? "Upgrading..." : "Confirm Upgrade"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
