@@ -29,6 +29,7 @@ export interface IStorage {
   getTicketCategoriesByEvent(eventId: number): Promise<TicketCategory[]>;
   createTicketCategory(cat: InsertTicketCategory): Promise<TicketCategory>;
   updateTicketCategorySold(id: number, sold: number): Promise<TicketCategory | undefined>;
+  updateTicketCategory(id: number, data: Partial<InsertTicketCategory>): Promise<TicketCategory | undefined>;
 
   getTicketsByEvent(eventId: number): Promise<Ticket[]>;
   getTicketsByUser(userId: string): Promise<Ticket[]>;
@@ -64,7 +65,7 @@ export interface IStorage {
 
 class DatabaseStorage implements IStorage {
   async getEvents(): Promise<Event[]> {
-    return db.select().from(events).orderBy(desc(events.date));
+    return db.select().from(events).orderBy(desc(events.id));
   }
 
   async getEvent(id: number): Promise<Event | undefined> {
@@ -116,6 +117,11 @@ class DatabaseStorage implements IStorage {
 
   async updateTicketCategorySold(id: number, sold: number): Promise<TicketCategory | undefined> {
     const [updated] = await db.update(ticketCategories).set({ sold }).where(eq(ticketCategories.id, id)).returning();
+    return updated;
+  }
+
+  async updateTicketCategory(id: number, data: Partial<InsertTicketCategory>): Promise<TicketCategory | undefined> {
+    const [updated] = await db.update(ticketCategories).set(data as any).where(eq(ticketCategories.id, id)).returning();
     return updated;
   }
 

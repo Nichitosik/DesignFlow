@@ -71,19 +71,19 @@ A full-stack entertainment center management application with real-time ticket v
 - `client/src/components/` - AppSidebar (i18n menus), VenueMap (minimalist SVG), TicketCard, ParkingMonitor, CapacityMeter, StatusBadge, NotificationCard, ThemeProvider, ThemeToggle
 
 ## Key Features
-- **Ticket categories & pricing**: Main/Tribuna/VIP with per-event pricing, live availability display
-- **Ticket upgrades**: Spectators can upgrade (Main→Tribuna→VIP) with price difference calculation, instant WebSocket broadcast to staff/organizers
+- **Real ticket purchase flow**: Spectators browse events, buy tickets (Main/Tribuna/VIP) via "Buy Ticket" button → confirmation dialog → POST API → instant QR code in "My Tickets"
+- **Real ticket upgrade**: Spectators upgrade Main→Tribuna→VIP with price difference; WS broadcast to staff/organizers
+- **Organizer event creation**: Full multi-step "Create Event" form (name, venue, date, time, capacity, ticket categories with prices). No demo/seed buttons in UI
+- **Real-time ticket price editing**: Organizers can edit ticket category prices inline; change broadcasts instantly via WebSocket to all users
 - **Multi-language**: English, Romanian, Russian with instant switching via LanguageSelector
-- **Venue management**: Venues with coordinates (Chișinău Arena demo), extensible location system
-- **Real QR code generation**: Each ticket shows a real, scannable SVG QR code via `qrcode.react`. Fullscreen QR view for easy phone scanning (spectator view + demo tickets)
-- **Camera QR scanning**: Staff scanner uses native BarcodeDetector API (Chrome/Edge) to scan QR codes from phone camera in real-time. Graceful fallback for unsupported browsers.
-- **Interactive map with OpenStreetMap**: Directions page embeds OpenStreetMap iframe showing venue location in Chișinău. "Open in Google Maps" links for navigation. Routes with step-by-step directions.
-- Demo ticket mode: Simulates ticket lifecycle (pending→valid→used→invalid)
+- **Real QR code generation**: Each ticket shows a scannable SVG QR code. Fullscreen QR view for easy phone scanning
+- **Camera QR scanning**: Staff scanner uses native BarcodeDetector API (Chrome/Edge). Graceful fallback for unsupported browsers. No demo mode
+- **Real Google Maps Directions**: User enters starting location → "Get Directions" opens Google Maps with real turn-by-turn directions. Transport mode selection (car/walk/transit). Uses venue coordinates from DB
+- **Venue management**: Venues with coordinates, linked to events via venueId foreign key
 - Live simulation: Parking updates every 5s, analytics charts every 5s, stats refresh every 10s
-- Transport mode selection: Car, walking, public transport with step-by-step routes
 - Minimalist venue map: Clean flat SVG design with zone occupancy color coding
 - AI recommendations: Based on live event data, confidence scores, apply/pending status
-- **WebSocket real-time sync**: ticket_scanned, ticket_upgraded, ticket_category_update, zone_update, parking_update, notification events
+- **WebSocket real-time sync**: ticket_purchased, ticket_scanned, ticket_upgraded, ticket_category_update, zone_update, parking_update, notification events
 
 ## Color Scheme
 - Primary purple: 260 80% 50%

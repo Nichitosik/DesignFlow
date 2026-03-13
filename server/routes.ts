@@ -153,6 +153,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch("/api/events/:eventId/ticket-categories/:id", isAuthenticated, requireRole("organizer"), async (req, res) => {
+    try {
+      const { price, capacity } = req.body;
+      const updateData: any = {};
+      if (price !== undefined) updateData.price = Number(price);
+      if (capacity !== undefined) updateData.capacity = Number(capacity);
+      const cat = await storage.updateTicketCategory(Number(req.params.id), updateData);
+      if (!cat) return res.status(404).json({ message: "Category not found" });
+      broadcast(cat.eventId, { type: "ticket_category_update", data: cat });
+      res.json(cat);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update ticket category" });
+    }
+  });
+
   // Ticket Availability (public)
   app.get("/api/events/:eventId/ticket-availability", async (req, res) => {
     try {
@@ -197,14 +212,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const ticketCode = randomUUID();
       const userId = req.user.claims.sub;
+      const eventId = Number(req.params.eventId);
+      const { category = "Main" } = req.body;
+
+      const cats = await storage.getTicketCategoriesByEvent(eventId);
+      const cat = cats.find(c => c.name === category);
+      if (!cat) return res.status(400).json({ message: "Ticket category not found" });
+
+      const available = cat.capacity - (cat.sold || 0);
+      if (available <= 0) return res.status(400).json({ message: "No tickets available in this category" });
+
+      const zoneMap: Record<string, string> = { Main: "Main Area", Tribuna: "Tribune Section", VIP: "VIP Zone" };
+
       const parsed = insertTicketSchema.parse({
         ...req.body,
-        eventId: Number(req.params.eventId),
+        eventId,
         userId,
         ticketCode,
         status: "valid",
+        category,
+        price: cat.price,
+        zone: zoneMap[category] || "General",
       });
       const ticket = await storage.createTicket(parsed);
+
+      await storage.updateTicketCategorySold(cat.id, (cat.sold || 0) + 1);
+
+      broadcast(eventId, { type: "ticket_purchased", data: { ticket, category, price: cat.price } });
+
       res.status(201).json(ticket);
     } catch (error: any) {
       if (error.name === "ZodError") return res.status(400).json({ message: "Validation error", errors: error.errors });

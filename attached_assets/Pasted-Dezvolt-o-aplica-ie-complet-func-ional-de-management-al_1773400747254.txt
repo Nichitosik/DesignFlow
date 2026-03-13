@@ -1,0 +1,122 @@
+Dezvoltă o aplicație complet funcțională de management al evenimentelor și biletelor digitale, unde toate datele sunt procesate în timp real (real-time) și nu folosesc date demo sau mock.
+Cerințe generale sistem:
+Sistemul trebuie să aibă backend real (API + database).
+Toate datele trebuie sincronizate în timp real între:
+Organizatori
+Staff
+Spectatori
+Orice modificare trebuie să fie vizibilă instant pentru toți utilizatorii (ex: bilete scanate, upgrade, modificare preț).
+Roluri utilizatori:
+Organizator:
+Organizatorul trebuie să poată:
+crea evenimente
+seta:
+nume eveniment
+locație
+dată
+zone (Main, VIP, Tribune)
+prețuri reale pentru fiecare zonă
+număr bilete disponibile
+modifica prețurile
+vedea statistici:
+bilete vândute
+bilete scanate
+bilete rămase
+Spectator:
+Spectatorul trebuie să poată:
+crea cont
+vedea evenimente disponibile
+cumpăra bilete reale (nu demo)
+primi bilet digital cu:
+QR code sau barcode
+ID unic
+vedea status bilet:
+valid
+scanat
+expirat
+Sistem bilete:
+Fiecare bilet trebuie să aibă:
+ID unic generat automat (UUID)
+QR code unic
+status:
+valid
+scanat
+invalid
+zonă
+preț real
+owner (user)
+Staff:
+Staff trebuie să aibă aplicație de scanare unde poate:
+scana QR code
+verifica:
+dacă biletul există
+dacă este valid
+dacă a fost deja scanat
+sistemul trebuie să arate:
+VALID (verde)
+ALREADY USED (roșu)
+INVALID (roșu)
+După scanare:
+statusul biletului devine SCANNED
+update în real time pentru organizator.
+Upgrade bilet:
+Trebuie implementată funcția:
+Upgrade ticket:
+spectator poate face upgrade:
+Main → Tribune
+Tribune → VIP
+sistemul calculează diferența de preț.
+utilizatorul plătește doar diferența.
+biletul vechi devine invalid.
+se generează bilet nou.
+Google Maps:
+Integrarea Google Maps trebuie să fie:
+real API (nu demo)
+locații reale
+direcții reale
+Funcționalitate:
+User poate:
+introduce destinația direct în aplicație
+sau:
+apăsa Open in Google Maps
+Trebuie eliminat:
+date mock
+trasee fake
+UI demo routes (ca în screenshot)
+Harta trebuie să:
+arate locația evenimentului real
+permită navigare reală
+folosească Google Maps Directions API.
+Real time requirements:
+Trebuie folosit:
+WebSockets sau Firebase
+sau:
+Socket.io
+sau:
+Supabase realtime
+Pentru update instant:
+scanare bilete
+cumpărare bilete
+upgrade
+modificare preț.
+Tehnic:
+Sugestie arhitectură:
+Frontend:
+React / Angular
+Google Maps API
+Backend:
+Node.js / Java / .NET
+REST API
+Database:
+PostgreSQL / MongoDB
+Real time:
+WebSocket
+Auth:
+JWT
+Obiectiv:
+Aplicația trebuie să simuleze un sistem real folosit la evenimente mari (concert, stadion, arena) unde:
+biletele sunt reale
+scanarea este reală
+datele sunt sincronizate live
+prețurile sunt reale
+nu există componente demo.
