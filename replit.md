@@ -75,6 +75,9 @@ A full-stack entertainment center management application with real-time ticket v
 - **Ticket upgrades**: Spectators can upgrade (Main→Tribuna→VIP) with price difference calculation, instant WebSocket broadcast to staff/organizers
 - **Multi-language**: English, Romanian, Russian with instant switching via LanguageSelector
 - **Venue management**: Venues with coordinates (Chișinău Arena demo), extensible location system
+- **Real QR code generation**: Each ticket shows a real, scannable SVG QR code via `qrcode.react`. Fullscreen QR view for easy phone scanning (spectator view + demo tickets)
+- **Camera QR scanning**: Staff scanner uses native BarcodeDetector API (Chrome/Edge) to scan QR codes from phone camera in real-time. Graceful fallback for unsupported browsers.
+- **Interactive map with OpenStreetMap**: Directions page embeds OpenStreetMap iframe showing venue location in Chișinău. "Open in Google Maps" links for navigation. Routes with step-by-step directions.
 - Demo ticket mode: Simulates ticket lifecycle (pending→valid→used→invalid)
 - Live simulation: Parking updates every 5s, analytics charts every 5s, stats refresh every 10s
 - Transport mode selection: Car, walking, public transport with step-by-step routes

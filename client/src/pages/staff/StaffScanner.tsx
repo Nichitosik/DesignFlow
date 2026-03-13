@@ -3,13 +3,19 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { StatusBadge } from "@/components/StatusBadge";
-import { ScanLine, CheckCircle2, Database, XCircle, RefreshCw, Clock, Play, RotateCcw, ArrowRight, Ticket } from "lucide-react";
-import { useState } from "react";
+import { ScanLine, CheckCircle2, Database, XCircle, RefreshCw, Clock, Play, RotateCcw, Ticket, Camera, CameraOff, AlertCircle } from "lucide-react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { useI18n } from "@/lib/i18n";
+
+declare global {
+  interface Window {
+    BarcodeDetector?: any;
+  }
+}
 
 interface ScanResult {
   status: "valid" | "already_used" | "invalid" | null;
@@ -35,7 +41,19 @@ export default function StaffScanner() {
   const [lastScanResult, setLastScanResult] = useState<ScanResult | null>(null);
   const [demoMode, setDemoMode] = useState(false);
   const [demoTickets, setDemoTickets] = useState<DemoTicket[]>([]);
+  const [cameraActive, setCameraActive] = useState(false);
+  const [cameraError, setCameraError] = useState<string | null>(null);
+  const [barcodeDetectorSupported, setBarcodeDetectorSupported] = useState<boolean | null>(null);
   const { toast } = useToast();
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const scanIntervalRef = useRef<number | null>(null);
+  const detectorRef = useRef<any>(null);
+  const lastScannedRef = useRef<string>("");
+
+  useEffect(() => {
+    setBarcodeDetectorSupported("BarcodeDetector" in window);
+  }, []);
 
   const { data: events, isLoading } = useQuery<any[]>({ queryKey: ["/api/events"] });
   const activeEvent = events?.find((e: any) => e.status === "active") || events?.[0];
@@ -44,6 +62,79 @@ export default function StaffScanner() {
     queryKey: ["/api/events", activeEvent?.id, "stats"],
     enabled: !!activeEvent,
   });
+
+  const processScannedCode = useCallback((code: string) => {
+    if (!code || code === lastScannedRef.current) return;
+    lastScannedRef.current = code;
+    setTimeout(() => { lastScannedRef.current = ""; }, 3000);
+    setScanCode(code);
+    stopCamera();
+    if (demoMode) {
+      handleDemoScanCode(code);
+    } else {
+      scanMutation.mutate(code);
+    }
+  }, [demoMode]);
+
+  const startCamera = async () => {
+    setCameraError(null);
+    lastScannedRef.current = "";
+
+    if (!barcodeDetectorSupported) {
+      setCameraError("QR scanning is not supported in this browser. Use Chrome on Android or Desktop.");
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } },
+      });
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+      }
+      setCameraActive(true);
+
+      const detector = new window.BarcodeDetector!({ formats: ["qr_code"] });
+      detectorRef.current = detector;
+
+      const scan = async () => {
+        if (!videoRef.current || !detectorRef.current) return;
+        try {
+          const barcodes = await detectorRef.current.detect(videoRef.current);
+          if (barcodes.length > 0) {
+            processScannedCode(barcodes[0].rawValue);
+          }
+        } catch {}
+      };
+
+      scanIntervalRef.current = window.setInterval(scan, 300);
+    } catch (err: any) {
+      setCameraError("Camera access denied. Please allow camera permissions in your browser.");
+      setCameraActive(false);
+    }
+  };
+
+  const stopCamera = () => {
+    if (scanIntervalRef.current) {
+      clearInterval(scanIntervalRef.current);
+      scanIntervalRef.current = null;
+    }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(t => t.stop());
+      streamRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+    detectorRef.current = null;
+    setCameraActive(false);
+  };
+
+  useEffect(() => {
+    return () => { stopCamera(); };
+  }, []);
 
   const scanMutation = useMutation({
     mutationFn: async (ticketCode: string) => {
@@ -69,18 +160,16 @@ export default function StaffScanner() {
       const errorMsg = error.message || "Unknown error";
       let status: ScanResult["status"] = "invalid";
       let message = "Ticket not found in the system. Entry denied.";
-
       if (errorMsg.includes("already used")) {
         status = "already_used";
-        message = "This ticket has already been scanned. Entry denied - possible duplicate.";
+        message = "This ticket has already been scanned. Entry denied.";
       } else if (errorMsg.includes("invalid")) {
         status = "invalid";
         message = "Ticket is invalid or has been revoked. Entry denied.";
       } else if (errorMsg.includes("404") || errorMsg.includes("not found")) {
         status = "invalid";
-        message = "No ticket found with this code. Verify the code and try again.";
+        message = "No ticket found with this code. Verify and try again.";
       }
-
       const result: ScanResult = { status, message, ticketCode: scanCode, timestamp: new Date().toLocaleTimeString() };
       setLastScanResult(result);
       setScanHistory(prev => [result, ...prev].slice(0, 20));
@@ -103,10 +192,10 @@ export default function StaffScanner() {
     ];
     setDemoTickets(tickets);
     setDemoMode(true);
-    toast({ title: "Demo Mode Active", description: "Demo tickets created with different statuses. Try scanning them!" });
+    toast({ title: "Demo Mode Active", description: "4 demo tickets created. Try scanning them!" });
   };
 
-  const handleDemoScan = (code: string) => {
+  const handleDemoScanCode = (code: string) => {
     const ticket = demoTickets.find(t => t.code === code);
     if (!ticket) {
       const result: ScanResult = { status: "invalid", message: "No ticket found with this code.", ticketCode: code, timestamp: new Date().toLocaleTimeString() };
@@ -115,7 +204,7 @@ export default function StaffScanner() {
       return;
     }
     if (ticket.status === "used") {
-      const result: ScanResult = { status: "already_used", message: "This ticket has already been scanned.", ticketCode: code, zone: ticket.zone, seat: ticket.seat, timestamp: new Date().toLocaleTimeString() };
+      const result: ScanResult = { status: "already_used", message: "Already scanned.", ticketCode: code, zone: ticket.zone, seat: ticket.seat, timestamp: new Date().toLocaleTimeString() };
       setLastScanResult(result);
       setScanHistory(prev => [result, ...prev].slice(0, 20));
       return;
@@ -127,17 +216,17 @@ export default function StaffScanner() {
       return;
     }
     setDemoTickets(prev => prev.map(t => t.code === code ? { ...t, status: "used" } : t));
-    const result: ScanResult = { status: "valid", message: "Ticket validated successfully. Entry granted.", ticketCode: code, zone: ticket.zone, seat: ticket.seat, timestamp: new Date().toLocaleTimeString() };
+    const result: ScanResult = { status: "valid", message: "Entry granted.", ticketCode: code, zone: ticket.zone, seat: ticket.seat, timestamp: new Date().toLocaleTimeString() };
     setLastScanResult(result);
     setScanHistory(prev => [result, ...prev].slice(0, 20));
-    toast({ title: "Valid Ticket (Demo)", description: `${code} - Entry granted` });
+    toast({ title: "Valid Ticket", description: `${code} - Entry granted` });
     setScanCode("");
   };
 
-  const handleScan = () => {
+  const handleManualScan = () => {
     if (!scanCode) return;
     if (demoMode) {
-      handleDemoScan(scanCode);
+      handleDemoScanCode(scanCode);
     } else {
       scanMutation.mutate(scanCode);
     }
@@ -232,7 +321,7 @@ export default function StaffScanner() {
           <CardHeader className="pb-3">
             <h3 className="font-semibold text-sm flex items-center gap-2">
               <Ticket className="h-4 w-4" />
-              Demo Tickets (click code to auto-fill scanner)
+              Demo Tickets (click code to fill scanner)
             </h3>
           </CardHeader>
           <CardContent className="space-y-2">
@@ -265,14 +354,58 @@ export default function StaffScanner() {
               placeholder="Enter or scan ticket code..."
               value={scanCode}
               onChange={(e) => setScanCode(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleScan()}
+              onKeyDown={(e) => e.key === "Enter" && handleManualScan()}
               data-testid="input-ticket-code"
             />
-            <Button onClick={handleScan} disabled={!scanCode || scanMutation.isPending} data-testid="button-scan-ticket">
+            <Button onClick={handleManualScan} disabled={!scanCode || scanMutation.isPending} data-testid="button-scan-ticket">
               <ScanLine className="h-4 w-4 mr-2" />
               Scan
             </Button>
+            <Button
+              variant="outline"
+              onClick={cameraActive ? stopCamera : startCamera}
+              data-testid="button-camera-scan"
+              title={cameraActive ? "Stop camera" : "Scan with camera"}
+            >
+              {cameraActive ? <CameraOff className="h-4 w-4" /> : <Camera className="h-4 w-4" />}
+            </Button>
           </div>
+
+          {barcodeDetectorSupported === false && (
+            <div className="p-3 rounded-md border border-[hsl(38,90%,55%)]/30 bg-[hsl(38,90%,55%)]/5 flex items-start gap-2 text-sm">
+              <AlertCircle className="h-4 w-4 text-[hsl(38,90%,55%)] shrink-0 mt-0.5" />
+              <span className="text-muted-foreground">Camera QR scanning requires Chrome on Android or a modern desktop browser. Use manual input instead.</span>
+            </div>
+          )}
+
+          {cameraError && (
+            <div className="p-3 rounded-md border border-[hsl(0,80%,55%)]/30 bg-[hsl(0,80%,55%)]/5 flex items-start gap-2 text-sm" data-testid="camera-error">
+              <AlertCircle className="h-4 w-4 text-[hsl(0,80%,55%)] shrink-0 mt-0.5" />
+              <span className="text-muted-foreground">{cameraError}</span>
+            </div>
+          )}
+
+          {cameraActive && (
+            <div className="space-y-2" data-testid="camera-scanner-view">
+              <div className="relative rounded-md overflow-hidden border bg-black">
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  className="w-full"
+                  style={{ maxHeight: 320 }}
+                />
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <div className="w-48 h-48 border-2 border-white/60 rounded-md" style={{ boxShadow: "0 0 0 9999px rgba(0,0,0,0.4)" }} />
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground flex items-center gap-1">
+                <Camera className="h-3 w-3" />
+                Point camera at the QR code on the ticket
+              </p>
+            </div>
+          )}
 
           {lastScanResult && (
             <div className={`p-4 rounded-md border ${getScanResultBg(lastScanResult.status)}`} data-testid="scan-result">

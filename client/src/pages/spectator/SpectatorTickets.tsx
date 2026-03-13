@@ -2,13 +2,8 @@ import { TicketCard } from "@/components/TicketCard";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Database, Ticket, QrCode, Play, RotateCcw, ArrowRight, ArrowUpCircle, Tag, Users } from "lucide-react";
-import { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Skeleton } from "@/components/ui/skeleton";
-import { useToast } from "@/hooks/use-toast";
-import { useEventWebSocket } from "@/hooks/use-websocket";
+import { Database, Ticket, QrCode, Play, RotateCcw, ArrowRight, ArrowUpCircle, Tag, Users, Maximize2, X } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
 import {
   Dialog,
   DialogContent,
@@ -17,6 +12,12 @@ import {
   DialogFooter,
   DialogDescription,
 } from "@/components/ui/dialog";
+import { useState } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useToast } from "@/hooks/use-toast";
+import { useEventWebSocket } from "@/hooks/use-websocket";
 
 interface DemoTicket {
   id: string;
@@ -45,6 +46,7 @@ export default function SpectatorTickets() {
   const [upgradeDialogOpen, setUpgradeDialogOpen] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState<any>(null);
   const [selectedCategory, setSelectedCategory] = useState<string>("");
+  const [qrDialogTicket, setQrDialogTicket] = useState<DemoTicket | null>(null);
   const { toast } = useToast();
 
   const { data: events, isLoading: eventsLoading } = useQuery<any[]>({
@@ -282,6 +284,15 @@ export default function SpectatorTickets() {
                     <Badge variant="outline" className={statusColor(ticket.status)}>
                       {ticket.status.toUpperCase()}
                     </Badge>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => setQrDialogTicket(ticket)}
+                      data-testid={`button-show-qr-${ticket.id}`}
+                      title="Show QR code"
+                    >
+                      <QrCode className="h-4 w-4" />
+                    </Button>
                   </div>
                 </div>
                 <div className="text-xs text-muted-foreground flex items-center gap-3 flex-wrap">
@@ -443,6 +454,49 @@ export default function SpectatorTickets() {
               {upgradeMutation.isPending ? "Upgrading..." : "Confirm Upgrade"}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!qrDialogTicket} onOpenChange={(open) => !open && setQrDialogTicket(null)}>
+        <DialogContent className="max-w-sm" data-testid="dialog-demo-qr">
+          <DialogHeader className="sr-only">
+            <DialogTitle>Ticket QR Code</DialogTitle>
+          </DialogHeader>
+          {qrDialogTicket && (
+            <div className="flex flex-col items-center gap-4 py-4">
+              <div className="text-center">
+                <h3 className="font-semibold text-lg">Ticket QR Code</h3>
+                <p className="text-sm text-muted-foreground">{activeEvent?.name}</p>
+              </div>
+              <div className="p-4 bg-white rounded-md shadow-sm">
+                <QRCodeSVG
+                  value={qrDialogTicket.code}
+                  size={280}
+                  level="H"
+                  includeMargin
+                  data-testid="qr-code-fullscreen"
+                />
+              </div>
+              <div className="text-center space-y-1">
+                <p className="font-mono text-sm font-medium">{qrDialogTicket.code}</p>
+                <p className="text-xs text-muted-foreground">{qrDialogTicket.zone} · {qrDialogTicket.seat}</p>
+                <Badge variant="outline" className={statusColor(qrDialogTicket.status)}>
+                  {qrDialogTicket.status.toUpperCase()}
+                </Badge>
+              </div>
+              <p className="text-xs text-muted-foreground text-center">
+                Show this QR code to staff for scanning and entry validation
+              </p>
+              <Button
+                variant="outline"
+                onClick={() => setQrDialogTicket(null)}
+                data-testid="button-close-demo-qr"
+              >
+                <X className="h-4 w-4 mr-1" />
+                Close
+              </Button>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>
