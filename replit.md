@@ -24,9 +24,10 @@ A full-stack entertainment center management application with real-time ticket v
 
 ## User Roles & Multi-Page Routing
 - **Spectator** (`/spectator/*`):
-  - My Tickets (`/spectator/tickets`) - View tickets with QR codes, demo ticket lifecycle mode, ticket availability with pricing, upgrade flow
+  - Events (`/spectator/events`) - **DEFAULT** Afisha-style events listing, card + map view, upcoming/all filter
+  - My Tickets (`/spectator/tickets`) - View tickets with QR codes, ticket availability with pricing, upgrade flow, Tribune auto-seat assignment
   - Venue Map (`/spectator/map`) - Interactive minimalist venue map
-  - Directions (`/spectator/directions`) - Transport mode selection (car/walk/transit), location search, route steps
+  - Directions (`/spectator/directions`) - Auto-geolocation, Google Maps embed (shows route from user to venue), "Open Navigation" button
   - Parking (`/spectator/parking`) - Live parking availability with simulation
 - **Staff** (`/staff/*`):
   - Scanner (`/staff/scanner`) - Ticket scanning with demo mode, scan history

@@ -15,6 +15,8 @@ import {
 import { users, type User, type UpsertUser } from "@shared/models/auth";
 
 export interface IStorage {
+  getUser(id: string): Promise<User | undefined>;
+
   getEvents(): Promise<Event[]>;
   getEvent(id: number): Promise<Event | undefined>;
   createEvent(event: InsertEvent): Promise<Event>;
@@ -64,6 +66,11 @@ export interface IStorage {
 }
 
 class DatabaseStorage implements IStorage {
+  async getUser(id: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user;
+  }
+
   async getEvents(): Promise<Event[]> {
     return db.select().from(events).orderBy(desc(events.id));
   }

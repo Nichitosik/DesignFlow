@@ -18,6 +18,7 @@ import { LogOut, Gauge } from "lucide-react";
 import { useState, useEffect, lazy, Suspense } from "react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 
+const SpectatorEvents = lazy(() => import("@/pages/spectator/SpectatorEvents"));
 const SpectatorTickets = lazy(() => import("@/pages/spectator/SpectatorTickets"));
 const SpectatorMap = lazy(() => import("@/pages/spectator/SpectatorMap"));
 const SpectatorDirections = lazy(() => import("@/pages/spectator/SpectatorDirections"));
@@ -73,7 +74,7 @@ function LandingPage() {
 }
 
 const roleDefaultPaths: Record<UserRole, string> = {
-  spectator: "/spectator/tickets",
+  spectator: "/spectator/events",
   staff: "/staff/scanner",
   organizer: "/organizer/overview",
 };
@@ -159,6 +160,7 @@ function AuthenticatedApp() {
               <Switch>
                 {role === "spectator" && (
                   <>
+                    <Route path="/spectator/events" component={SpectatorEvents} />
                     <Route path="/spectator/tickets" component={SpectatorTickets} />
                     <Route path="/spectator/map" component={SpectatorMap} />
                     <Route path="/spectator/directions" component={SpectatorDirections} />

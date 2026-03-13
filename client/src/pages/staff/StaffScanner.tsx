@@ -23,6 +23,8 @@ interface ScanResult {
   zone?: string;
   seat?: string;
   category?: string;
+  ownerName?: string | null;
+  ownerEmail?: string | null;
   timestamp?: string;
 }
 
@@ -134,6 +136,8 @@ export default function StaffScanner() {
         zone: data.zone,
         seat: data.seat,
         category: data.category,
+        ownerName: data.ownerName,
+        ownerEmail: data.ownerEmail,
         timestamp: new Date().toLocaleTimeString(),
       };
       setLastScanResult(result);
@@ -349,7 +353,12 @@ export default function StaffScanner() {
                     <p className="text-xs text-muted-foreground">
                       Zone: {lastScanResult.zone}
                       {lastScanResult.category && ` · ${lastScanResult.category}`}
-                      {lastScanResult.seat ? ` · ${lastScanResult.seat}` : ""}
+                      {lastScanResult.seat && ` · ${lastScanResult.seat}`}
+                    </p>
+                  )}
+                  {(lastScanResult.ownerName || lastScanResult.ownerEmail) && (
+                    <p className="text-xs text-muted-foreground">
+                      Owner: {lastScanResult.ownerName || lastScanResult.ownerEmail}
                     </p>
                   )}
                 </div>

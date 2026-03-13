@@ -1,0 +1,183 @@
+Vreau să transform aplicația mea de management al evenimentelor într-un sistem real, nu demo. Toate funcționalitățile trebuie să fie conectate la backend și baza de date și să funcționeze în real-time.
+1. Multi-language (Internationalization)
+Trebuie implementat un sistem real de schimbare a limbii aplicației.
+Cerințe:
+Când utilizatorul schimbă limba, toată aplicația trebuie să se actualizeze automat:
+meniuri
+butoane
+descrieri
+evenimente
+mesaje sistem
+status bilete
+Limbile trebuie gestionate printr-un sistem i18n (ex:
+react-i18next sau Angular translate).
+Nu doar UI trebuie tradus, dar și:
+categorii evenimente
+statusuri
+notificări
+Limba selectată trebuie salvată:
+localStorage
+sau
+user profile.
+2. Google Maps – locația reală a utilizatorului
+Trebuie eliminată partea demo de direcții.
+Trebuie:
+eliminat complet:
+Get Directions to Chișinău Arena
+Transport mode
+Car / Walking / Transit
+fake route UI
+demo directions text
+Trebuie implementat:
+detectarea automată a locației utilizatorului (Geolocation API)
+când utilizatorul deschide harta:
+se arată poziția lui exactă
+marker pe hartă
+să existe doar:
+hartă reală Google Maps
+marker user
+marker eveniment
+Funcționalitate:
+buton:
+Open in Google Maps
+Care deschide:
+navigare reală Google Maps.
+3. Evenimente reale (nu mock data)
+Adăugarea evenimentelor nu trebuie să fie demo.
+Trebuie:
+Organizatorul să poată:
+adăuga eveniment real în database
+după creare:
+apare automat pe site
+apare la spectatori
+apare la staff
+La creare trebuie setat:
+nume eveniment
+descriere
+locație reală (Google Maps autocomplete)
+dată
+zone:
+Main
+Tribune
+VIP
+preț per zonă
+număr bilete per zonă
+IMPORTANT:
+aceste detalii nu trebuie afișate pe homepage.
+doar în pagina evenimentului.
+Locația:
+Trebuie:
+Google Places API
+autocomplete adresă
+salvare coordonate reale.
+4. Staff dashboard
+Staff trebuie să aibă interfață reală.
+Trebuie să vadă:
+lista evenimentelor
+ce eveniment este activ
+scanner bilete
+Scanner trebuie:
+QR scanner (telefon camera)
+verificare în database
+Trebuie să vadă:
+dacă bilet valid
+dacă scanat deja
+tip bilet
+zona
+owner
+Real time sync:
+Dacă:
+spectator upgrade
+spectator transfer
+spectator refund
+Status trebuie actualizat instant:
+staff
+organizator.
+5. Ticket logic (real system)
+Trebuie implementat sistem real de bilete.
+Flow:
+Spectator:
+vede evenimente reale
+cumpără bilet
+primește:
+QR code
+ticket ID
+zonă
+loc (dacă tribune)
+status.
+După scan:
+Trebuie:
+prima scanare:
+VALID TICKET
+a doua scanare:
+ALREADY SCANNED
+Trebuie update:
+ticket status = SCANNED
+După scan:
+update realtime:
+staff
+organizator.
+La bilete Tribune:
+Trebuie:
+row
+seat number.
+6. Map locations ca platforme reale (ex: Afisha)
+Trebuie îmbunătățit modul de afișare locații.
+Trebuie:
+listă locații evenimente
+map view
+card view
+Ca:
+Afisha.md style.
+Trebuie:
+filtru după:
+distanță
+popularitate
+dată.
+Map:
+toate evenimentele pe hartă
+marker custom.
+7. AI recommendations fix
+Trebuie reparat sistemul de recomandări AI.
+Probleme:
+nu generează rezultate
+nu filtrează corect.
+Trebuie:
+AI să recomande:
+evenimente similare
+după:
+categorie
+locație
+istoricul user
+bilete cumpărate.
+Dacă user nu are istoric:
+fallback:
+popular events
+upcoming events.
+Real time requirements:
+Trebuie folosit:
+WebSocket
+sau:
+Firebase realtime
+sau:
+Supabase realtime.
+Pentru:
+ticket scan
+ticket buy
+ticket upgrade
+status change.
+Obiectiv final:
+Aplicația trebuie să funcționeze ca un sistem real de ticketing ca:
+Ticketmaster
+Eventbrite
+Afisha
+Nu trebuie:
+mock data
+demo data
+fake routes
+hardcoded tickets.
+Totul trebuie:
+dynamic
+database driven
+real time
+production logic.

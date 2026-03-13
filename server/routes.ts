@@ -224,8 +224,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const zoneMap: Record<string, string> = { Main: "Main Area", Tribuna: "Tribune Section", VIP: "VIP Zone" };
 
+      let seatValue: string | undefined = undefined;
+      if (category === "Tribuna") {
+        const soldCount = cat.sold || 0;
+        const row = Math.ceil((soldCount + 1) / 30);
+        const seat = (soldCount % 30) + 1;
+        seatValue = `Row ${row}, Seat ${seat}`;
+      }
+
       const parsed = insertTicketSchema.parse({
-        ...req.body,
         eventId,
         userId,
         ticketCode,
@@ -233,6 +240,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         category,
         price: cat.price,
         zone: zoneMap[category] || "General",
+        ...(seatValue ? { seat: seatValue } : {}),
       });
       const ticket = await storage.createTicket(parsed);
 
@@ -608,7 +616,11 @@ Provide 2-4 recommendations as a JSON object with this structure:
       if (updated) {
         broadcast(ticket.eventId, { type: "ticket_scanned", data: updated });
       }
-      res.json(updated);
+      const owner = ticket.userId ? await storage.getUser(ticket.userId) : null;
+      const ownerName = owner
+        ? (`${owner.firstName || ""} ${owner.lastName || ""}`.trim() || owner.email || null)
+        : null;
+      res.json({ ...updated, ownerName, ownerEmail: owner?.email || null });
     } catch (error) {
       res.status(500).json({ message: "Failed to scan ticket" });
     }

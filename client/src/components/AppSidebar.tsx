@@ -20,6 +20,7 @@ import {
   ScanLine,
   Activity,
   Navigation,
+  CalendarDays,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -35,6 +36,7 @@ interface AppSidebarProps {
 
 const roleMenuDefs: Record<UserRole, { titleKey: string; url: string; icon: any; testId: string }[]> = {
   spectator: [
+    { titleKey: "nav.events", url: "/spectator/events", icon: CalendarDays, testId: "link-events" },
     { titleKey: "nav.myTickets", url: "/spectator/tickets", icon: Ticket, testId: "link-my-tickets" },
     { titleKey: "nav.venueMap", url: "/spectator/map", icon: Map, testId: "link-venue-map" },
     { titleKey: "nav.directions", url: "/spectator/directions", icon: Navigation, testId: "link-directions" },

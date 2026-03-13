@@ -1,226 +1,170 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { MapPin, Navigation, Car, Footprints, Bus, ExternalLink, LocateFixed } from "lucide-react";
-import { useState } from "react";
+import { MapPin, Navigation, ExternalLink, LocateFixed, Loader2, AlertCircle, CheckCircle2 } from "lucide-react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useI18n } from "@/lib/i18n";
 
-type TransportMode = "driving" | "walking" | "transit";
-
-const modeConfig: Record<TransportMode, { icon: any; label: string }> = {
-  driving: { icon: Car, label: "Car" },
-  walking: { icon: Footprints, label: "Walking" },
-  transit: { icon: Bus, label: "Transit" },
-};
-
-const DEFAULT_VENUE_NAME = "Chișinău Arena";
-const DEFAULT_VENUE_ADDRESS = "Strada Independenței 12, Chișinău, Moldova";
 const DEFAULT_LAT = 47.0245;
 const DEFAULT_LNG = 28.8327;
+const DEFAULT_VENUE_NAME = "Chișinău Arena";
+const DEFAULT_VENUE_ADDRESS = "Chișinău, Moldova";
 
-function buildGoogleMapsUrl(origin: string, destLat: number, destLng: number, mode: TransportMode) {
-  const dest = `${destLat},${destLng}`;
-  const params = new URLSearchParams({
-    api: "1",
-    destination: dest,
-    travelmode: mode,
-  });
-  if (origin.trim()) params.set("origin", origin.trim());
-  return `https://www.google.com/maps/dir/?${params.toString()}`;
-}
-
-function buildVenueMapUrl(lat: number, lng: number) {
-  return `https://maps.google.com/maps?q=${lat},${lng}&z=15&output=embed`;
-}
+type GeoStatus = "locating" | "located" | "unavailable";
 
 export default function SpectatorDirections() {
   const { t } = useI18n();
-  const [origin, setOrigin] = useState("");
-  const [mode, setMode] = useState<TransportMode>("driving");
-  const [locating, setLocating] = useState(false);
+  const [geoStatus, setGeoStatus] = useState<GeoStatus>("locating");
+  const [userLat, setUserLat] = useState<number | null>(null);
+  const [userLng, setUserLng] = useState<number | null>(null);
 
   const { data: events } = useQuery<any[]>({ queryKey: ["/api/events"] });
   const activeEvent = events?.find((e: any) => e.status === "active") || events?.[0];
 
   const { data: venues } = useQuery<any[]>({ queryKey: ["/api/venues"] });
-
   const venue = venues?.find((v: any) => v.id === activeEvent?.venueId) || venues?.[0];
+
   const venueName = venue?.name || DEFAULT_VENUE_NAME;
   const venueAddress = venue?.address
-    ? `${venue.address}, ${venue.city}, ${venue.country}`
+    ? `${venue.address}, ${venue.city || ""}, ${venue.country || "Moldova"}`
     : DEFAULT_VENUE_ADDRESS;
   const venueLat = venue?.latitude ?? DEFAULT_LAT;
   const venueLng = venue?.longitude ?? DEFAULT_LNG;
 
-  const mapEmbedUrl = buildVenueMapUrl(venueLat, venueLng);
-  const directionsUrl = buildGoogleMapsUrl(origin, venueLat, venueLng, mode);
-  const venueOnlyUrl = `https://www.google.com/maps/search/${venueLat},${venueLng}`;
-
-  const useCurrentLocation = () => {
-    if (!navigator.geolocation) return;
-    setLocating(true);
+  useEffect(() => {
+    if (!navigator.geolocation) {
+      setGeoStatus("unavailable");
+      return;
+    }
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        setOrigin(`${pos.coords.latitude},${pos.coords.longitude}`);
-        setLocating(false);
+        setUserLat(pos.coords.latitude);
+        setUserLng(pos.coords.longitude);
+        setGeoStatus("located");
       },
-      () => { setLocating(false); },
-      { timeout: 10000 }
+      () => {
+        setGeoStatus("unavailable");
+      },
+      { timeout: 12000, enableHighAccuracy: true }
+    );
+  }, []);
+
+  const retryLocation = () => {
+    setGeoStatus("locating");
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setUserLat(pos.coords.latitude);
+        setUserLng(pos.coords.longitude);
+        setGeoStatus("located");
+      },
+      () => setGeoStatus("unavailable"),
+      { timeout: 12000, enableHighAccuracy: true }
     );
   };
 
+  const mapEmbedUrl =
+    geoStatus === "located" && userLat !== null && userLng !== null
+      ? `https://maps.google.com/maps?saddr=${userLat},${userLng}&daddr=${venueLat},${venueLng}&output=embed`
+      : `https://maps.google.com/maps?q=${venueLat},${venueLng}&z=15&output=embed`;
+
+  const navigationUrl =
+    geoStatus === "located" && userLat !== null && userLng !== null
+      ? `https://www.google.com/maps/dir/?api=1&origin=${userLat},${userLng}&destination=${venueLat},${venueLng}&travelmode=driving`
+      : `https://www.google.com/maps/dir/?api=1&destination=${venueLat},${venueLng}&travelmode=driving`;
+
   return (
-    <div className="p-6 space-y-6 max-w-4xl mx-auto">
+    <div className="p-6 space-y-5 max-w-3xl mx-auto">
       <div>
         <h1 className="text-2xl font-bold" data-testid="text-directions-title">
-          {t("directions.title")}
+          {t("directions.getToVenue")} {venueName}
         </h1>
-        <p className="text-muted-foreground text-sm">Get real-time directions to the venue</p>
+        {activeEvent && (
+          <p className="text-muted-foreground text-sm mt-1">
+            {activeEvent.name}
+            {activeEvent.date && ` · ${new Date(activeEvent.date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}`}
+            {activeEvent.startTime && ` at ${activeEvent.startTime}`}
+          </p>
+        )}
+      </div>
+
+      <div
+        className={`flex items-center gap-2.5 p-3 rounded-md border text-sm ${
+          geoStatus === "locating"
+            ? "border-[hsl(38,90%,55%)]/30 bg-[hsl(38,90%,55%)]/5 text-[hsl(38,90%,55%)]"
+            : geoStatus === "located"
+            ? "border-[hsl(142,70%,45%)]/30 bg-[hsl(142,70%,45%)]/5 text-[hsl(142,70%,45%)]"
+            : "border-muted bg-muted/30 text-muted-foreground"
+        }`}
+        data-testid="geo-status-banner"
+      >
+        {geoStatus === "locating" && <Loader2 className="h-4 w-4 animate-spin shrink-0" />}
+        {geoStatus === "located" && <CheckCircle2 className="h-4 w-4 shrink-0" />}
+        {geoStatus === "unavailable" && <AlertCircle className="h-4 w-4 shrink-0" />}
+        <span className="flex-1">
+          {geoStatus === "locating" && t("directions.locating")}
+          {geoStatus === "located" && t("directions.located")}
+          {geoStatus === "unavailable" && t("directions.locationUnavailable")}
+        </span>
+        {geoStatus === "unavailable" && (
+          <Button size="sm" variant="ghost" onClick={retryLocation} data-testid="button-retry-location">
+            <LocateFixed className="h-3.5 w-3.5 mr-1" />
+            Retry
+          </Button>
+        )}
       </div>
 
       <Card className="overflow-hidden" data-testid="map-card">
         <iframe
+          key={mapEmbedUrl}
           src={mapEmbedUrl}
           width="100%"
-          height="340"
+          height="380"
           style={{ border: 0, display: "block" }}
-          title="Venue Location Map"
+          title="Navigation Map"
           data-testid="map-iframe"
           loading="lazy"
+          allowFullScreen
         />
         <div className="px-4 py-3 border-t flex items-center justify-between gap-3 flex-wrap">
-          <div className="flex items-center gap-2 text-sm">
+          <div className="flex items-center gap-2 min-w-0">
             <MapPin className="h-4 w-4 text-primary shrink-0" />
-            <div>
-              <span className="font-medium">{venueName}</span>
-              <span className="text-muted-foreground ml-2 text-xs hidden sm:inline">{venueAddress}</span>
+            <div className="min-w-0">
+              <p className="font-medium text-sm leading-tight">{venueName}</p>
+              <p className="text-xs text-muted-foreground truncate">{venueAddress}</p>
             </div>
           </div>
           <a
-            href={venueOnlyUrl}
+            href={`https://www.google.com/maps/search/${venueLat},${venueLng}`}
             target="_blank"
             rel="noopener noreferrer"
             data-testid="link-open-google-maps"
           >
             <Button variant="outline" size="sm">
-              <ExternalLink className="h-4 w-4 mr-1" />
-              Open in Google Maps
+              <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
+              {t("directions.openInMaps")}
             </Button>
           </a>
         </div>
       </Card>
 
-      <Card>
-        <CardContent className="p-5 space-y-4">
-          <h3 className="font-semibold flex items-center gap-2">
-            <Navigation className="h-5 w-5 text-primary" />
-            Get Directions to {venueName}
-          </h3>
+      <a
+        href={navigationUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        data-testid="link-open-navigation"
+        className="block"
+      >
+        <Button className="w-full" size="default">
+          <Navigation className="h-4 w-4 mr-2" />
+          {geoStatus === "located" ? t("directions.openNavigationFromLocation") : t("directions.openNavigation")}
+        </Button>
+      </a>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-muted-foreground">Your starting location</label>
-            <div className="flex gap-2">
-              <Input
-                placeholder="Enter your address or city..."
-                value={origin}
-                onChange={(e) => setOrigin(e.target.value)}
-                data-testid="input-origin"
-              />
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={useCurrentLocation}
-                disabled={locating}
-                title="Use my current location"
-                data-testid="button-use-location"
-              >
-                <LocateFixed className={`h-4 w-4 ${locating ? "animate-pulse" : ""}`} />
-              </Button>
-            </div>
-            {origin && origin.match(/^-?\d+\.\d+,-?\d+\.\d+$/) && (
-              <p className="text-xs text-muted-foreground">
-                Using your GPS coordinates
-              </p>
-            )}
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-muted-foreground">Transport mode</label>
-            <div className="flex gap-2 flex-wrap">
-              {(Object.entries(modeConfig) as [TransportMode, typeof modeConfig["driving"]][]).map(([m, cfg]) => {
-                const Icon = cfg.icon;
-                return (
-                  <Button
-                    key={m}
-                    variant={mode === m ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setMode(m)}
-                    data-testid={`button-mode-${m === "driving" ? "car" : m}`}
-                  >
-                    <Icon className="h-4 w-4 mr-1.5" />
-                    {cfg.label}
-                  </Button>
-                );
-              })}
-            </div>
-          </div>
-
-          <a
-            href={directionsUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            data-testid="link-get-directions"
-          >
-            <Button className="w-full" size="default">
-              <Navigation className="h-4 w-4 mr-2" />
-              {origin.trim() ? `Get Directions from ${origin.length > 30 ? origin.slice(0, 30) + "…" : origin}` : "Open Google Maps Directions"}
-            </Button>
-          </a>
-
-          <div className="border-t pt-4 space-y-1 text-sm text-muted-foreground">
-            <div className="flex items-start gap-2">
-              <MapPin className="h-4 w-4 shrink-0 mt-0.5 text-primary" />
-              <div>
-                <p className="font-medium text-foreground">{venueName}</p>
-                <p>{venueAddress}</p>
-              </div>
-            </div>
-            {activeEvent && (
-              <div className="flex items-start gap-2 mt-2">
-                <span className="h-4 w-4 shrink-0" />
-                <p className="text-xs">
-                  {activeEvent.name} — {activeEvent.date
-                    ? new Date(activeEvent.date).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })
-                    : ""}
-                  {activeEvent.startTime && ` at ${activeEvent.startTime}`}
-                </p>
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardContent className="p-5">
-          <h3 className="font-semibold mb-3">Quick Links</h3>
-          <div className="grid sm:grid-cols-3 gap-3">
-            {(["driving", "walking", "transit"] as TransportMode[]).map((m) => {
-              const cfg = modeConfig[m];
-              const Icon = cfg.icon;
-              const url = buildGoogleMapsUrl("", venueLat, venueLng, m);
-              return (
-                <a key={m} href={url} target="_blank" rel="noopener noreferrer" data-testid={`link-mode-${m}`}>
-                  <Button variant="outline" className="w-full justify-start gap-2">
-                    <Icon className="h-4 w-4" />
-                    By {cfg.label}
-                  </Button>
-                </a>
-              );
-            })}
-          </div>
-        </CardContent>
-      </Card>
+      {geoStatus === "unavailable" && (
+        <p className="text-xs text-center text-muted-foreground">
+          {t("directions.locationTip")}
+        </p>
+      )}
     </div>
   );
 }
