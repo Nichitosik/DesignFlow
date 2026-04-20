@@ -1,8 +1,19 @@
 import { useEffect, useRef } from "react";
 import { queryClient } from "@/lib/queryClient";
 
-export function useEventWebSocket(eventId: number | undefined, role?: string) {
+export interface WsEvent {
+  type: string;
+  data?: any;
+}
+
+export function useEventWebSocket(
+  eventId: number | undefined,
+  role?: string,
+  onEvent?: (event: WsEvent) => void,
+) {
   const wsRef = useRef<WebSocket | null>(null);
+  const onEventRef = useRef(onEvent);
+  onEventRef.current = onEvent;
 
   useEffect(() => {
     if (!eventId) return;
@@ -18,6 +29,11 @@ export function useEventWebSocket(eventId: number | undefined, role?: string) {
     ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
+
+        // Notify caller first
+        if (onEventRef.current) {
+          onEventRef.current(data);
+        }
 
         switch (data.type) {
           case "ticket_scanned":

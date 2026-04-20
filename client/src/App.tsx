@@ -7,16 +7,15 @@ import { ThemeProvider } from "@/components/ThemeProvider";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
-import { I18nProvider, useI18n } from "@/lib/i18n";
+import { I18nProvider } from "@/lib/i18n";
 import { LanguageSelector } from "@/components/LanguageSelector";
 import RoleSelector from "@/pages/RoleSelector";
-import NotFound from "@/pages/not-found";
+import LoginPage from "@/pages/LoginPage";
+import RegisterPage from "@/pages/RegisterPage";
 import { useAuth } from "@/hooks/use-auth";
-import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
-import { LogOut, Gauge } from "lucide-react";
+import { LogOut } from "lucide-react";
 import { useState, useEffect, lazy, Suspense } from "react";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
 
 const SpectatorEvents = lazy(() => import("@/pages/spectator/SpectatorEvents"));
 const SpectatorTickets = lazy(() => import("@/pages/spectator/SpectatorTickets"));
@@ -29,12 +28,13 @@ const StaffMonitoring = lazy(() => import("@/pages/staff/StaffMonitoring"));
 const StaffMap = lazy(() => import("@/pages/staff/StaffMap"));
 
 const OrganizerOverview = lazy(() => import("@/pages/organizer/OrganizerOverview"));
-const OrganizerMap = lazy(() => import("@/pages/organizer/OrganizerMap"));
 const OrganizerParking = lazy(() => import("@/pages/organizer/OrganizerParking"));
 const OrganizerAnalytics = lazy(() => import("@/pages/organizer/OrganizerAnalytics"));
 const OrganizerAI = lazy(() => import("@/pages/organizer/OrganizerAI"));
 
-type UserRole = "spectator" | "staff" | "organizer";
+const AdminPanel = lazy(() => import("@/pages/admin/AdminPanel"));
+
+type UserRole = "spectator" | "staff" | "organizer" | "admin";
 
 function PageLoader() {
   return (
@@ -44,39 +44,12 @@ function PageLoader() {
   );
 }
 
-function LandingPage() {
-  const { t } = useI18n();
-  return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-primary/10 via-background to-chart-2/10">
-      <div className="absolute top-4 right-4 flex items-center gap-2">
-        <LanguageSelector />
-        <ThemeToggle />
-      </div>
-      <Card className="max-w-md w-full">
-        <CardHeader className="text-center space-y-4">
-          <div className="flex items-center justify-center gap-2">
-            <Gauge className="h-10 w-10 text-primary" />
-            <h1 className="text-4xl font-bold">{t("app.name")}</h1>
-          </div>
-          <p className="text-muted-foreground">{t("app.tagline")}</p>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <p className="text-sm text-center text-muted-foreground">
-            {t("common.welcomeDesc")}
-          </p>
-          <Button className="w-full" onClick={() => window.location.href = "/api/login"} data-testid="button-login">
-            {t("common.login")}
-          </Button>
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
 
 const roleDefaultPaths: Record<UserRole, string> = {
   spectator: "/spectator/events",
   staff: "/staff/scanner",
   organizer: "/organizer/overview",
+  admin: "/admin/panel",
 };
 
 function AuthenticatedApp() {
@@ -86,23 +59,21 @@ function AuthenticatedApp() {
   const [location] = useLocation();
   const [switching, setSwitching] = useState(false);
 
-  const { data: userRoles, isLoading: rolesLoading } = useQuery<any[]>({
-    queryKey: ["/api/user/role"],
-  });
-
+  // Role stored in localStorage (no auth mode)
   useEffect(() => {
-    if (userRoles && userRoles.length > 0 && !role && !switching) {
-      const savedRole = userRoles[0].role as UserRole;
-      setRole(savedRole);
-      if (location === "/" || location === "") {
-        setLocation(roleDefaultPaths[savedRole]);
+    if (!role && !switching) {
+      const saved = localStorage.getItem("app-role") as UserRole | null;
+      if (saved) {
+        setRole(saved);
+        if (location === "/" || location === "") {
+          setLocation(roleDefaultPaths[saved]);
+        }
       }
     }
-  }, [userRoles, role, switching]);
+  }, []);
 
-  const handleSelectRole = async (selectedRole: UserRole) => {
-    await apiRequest("POST", "/api/user/role", { role: selectedRole });
-    queryClient.invalidateQueries({ queryKey: ["/api/user/role"] });
+  const handleSelectRole = (selectedRole: UserRole) => {
+    localStorage.setItem("app-role", selectedRole);
     setRole(selectedRole);
     setSwitching(false);
     setLocation(roleDefaultPaths[selectedRole]);
@@ -112,14 +83,6 @@ function AuthenticatedApp() {
     setSwitching(true);
     setRole(null);
   };
-
-  if (rolesLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-pulse text-muted-foreground">Loading...</div>
-      </div>
-    );
-  }
 
   if (!role) {
     return <RoleSelector onSelectRole={handleSelectRole} />;
@@ -177,10 +140,14 @@ function AuthenticatedApp() {
                 {role === "organizer" && (
                   <>
                     <Route path="/organizer/overview" component={OrganizerOverview} />
-                    <Route path="/organizer/map" component={OrganizerMap} />
                     <Route path="/organizer/parking" component={OrganizerParking} />
                     <Route path="/organizer/analytics" component={OrganizerAnalytics} />
                     <Route path="/organizer/ai" component={OrganizerAI} />
+                  </>
+                )}
+                {role === "admin" && (
+                  <>
+                    <Route path="/admin/panel" component={AdminPanel} />
                   </>
                 )}
                 <Route><Redirect to={roleDefaultPaths[role]} /></Route>
@@ -195,6 +162,7 @@ function AuthenticatedApp() {
 
 function Router() {
   const { user, isLoading } = useAuth();
+  const [authView, setAuthView] = useState<"login" | "register">("login");
 
   if (isLoading) {
     return (
@@ -205,7 +173,10 @@ function Router() {
   }
 
   if (!user) {
-    return <LandingPage />;
+    if (authView === "register") {
+      return <RegisterPage onNavigateLogin={() => setAuthView("login")} />;
+    }
+    return <LoginPage onNavigateRegister={() => setAuthView("register")} />;
   }
 
   return <AuthenticatedApp />;

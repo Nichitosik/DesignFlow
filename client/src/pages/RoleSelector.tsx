@@ -1,12 +1,12 @@
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Users, UserCheck, Gauge } from "lucide-react";
+import { Users, UserCheck, Gauge, ShieldCheck } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { LanguageSelector } from "@/components/LanguageSelector";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
 interface RoleSelectorProps {
-  onSelectRole: (role: "spectator" | "staff" | "organizer") => void;
+  onSelectRole: (role: "spectator" | "staff" | "organizer" | "admin") => void;
 }
 
 export default function RoleSelector({ onSelectRole }: RoleSelectorProps) {
@@ -18,7 +18,6 @@ export default function RoleSelector({ onSelectRole }: RoleSelectorProps) {
       icon: Users,
       colorClass: "bg-chart-5/10",
       iconColor: "text-chart-5",
-      descKey: "role.spectatorDesc",
       descFallback: "View your ticket, navigate the venue, and receive event updates",
     },
     {
@@ -26,7 +25,6 @@ export default function RoleSelector({ onSelectRole }: RoleSelectorProps) {
       icon: UserCheck,
       colorClass: "bg-[hsl(142,70%,45%)]/10",
       iconColor: "text-[hsl(142,70%,45%)]",
-      descKey: "role.staffDesc",
       descFallback: "Scan tickets, monitor entrances, and manage crowd flow",
     },
     {
@@ -34,8 +32,14 @@ export default function RoleSelector({ onSelectRole }: RoleSelectorProps) {
       icon: Gauge,
       colorClass: "bg-primary/10",
       iconColor: "text-primary",
-      descKey: "role.organizerDesc",
       descFallback: "Access analytics, AI recommendations, and full event control",
+    },
+    {
+      key: "admin" as const,
+      icon: ShieldCheck,
+      colorClass: "bg-[hsl(0,80%,55%)]/10",
+      iconColor: "text-[hsl(0,80%,55%)]",
+      descFallback: "Manage users, events, and system configuration",
     },
   ];
 
@@ -59,7 +63,7 @@ export default function RoleSelector({ onSelectRole }: RoleSelectorProps) {
           </p>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-6">
+        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
           {roles.map((r) => (
             <Card key={r.key} className="hover-elevate transition-all cursor-pointer" onClick={() => onSelectRole(r.key)} data-testid={`card-role-${r.key}`}>
               <CardHeader className="text-center">
@@ -81,7 +85,7 @@ export default function RoleSelector({ onSelectRole }: RoleSelectorProps) {
         </div>
 
         <div className="text-center text-xs text-muted-foreground">
-          <p>Demo mode - All roles available for exploration</p>
+          <p>Mod demonstrativ — toate rolurile sunt disponibile</p>
         </div>
       </div>
     </div>

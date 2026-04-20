@@ -242,6 +242,14 @@
     @apply hidden;
   }
 
+  .scrollbar-none {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+
   /* Placeholder styling for contentEditable div */
   [contenteditable][data-placeholder]:empty::before {
     content: attr(data-placeholder);
@@ -325,4 +333,9 @@
   .border.hover-elevate:not(.no-hover-interaction-elevate)::after {
     inset: -1px;
   }
+}
+
+/* QR scanner overlay — darkens edges around the scan frame */
+.qr-scan-overlay {
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.4);
 }

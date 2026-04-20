@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 import {
   events, tickets, venueZones, parkingLots, notifications, aiRecommendations, userRoles, venues, ticketCategories,
   type Event, type InsertEvent,
@@ -35,6 +35,7 @@ export interface IStorage {
 
   getTicketsByEvent(eventId: number): Promise<Ticket[]>;
   getTicketsByUser(userId: string): Promise<Ticket[]>;
+  getAllTickets(): Promise<Ticket[]>;
   getTicket(id: number): Promise<Ticket | undefined>;
   getTicketByCode(code: string): Promise<Ticket | undefined>;
   createTicket(ticket: InsertTicket): Promise<Ticket>;
@@ -59,6 +60,11 @@ export interface IStorage {
   getUserRoles(userId: string): Promise<UserRole[]>;
   getUserRoleForEvent(userId: string, eventId: number): Promise<UserRole | undefined>;
   setUserRole(userRole: InsertUserRole): Promise<UserRole>;
+
+  // Admin methods
+  getAllUsers(): Promise<User[]>;
+  deleteEvent(id: number): Promise<boolean>;
+  getAdminStats(): Promise<{ totalUsers: number; totalEvents: number; totalTickets: number; totalRevenue: number }>;
 
   getRecommendations(eventId: number): Promise<AiRecommendation[]>;
   createRecommendation(rec: InsertAiRecommendation): Promise<AiRecommendation>;
@@ -138,6 +144,10 @@ class DatabaseStorage implements IStorage {
 
   async getTicketsByUser(userId: string): Promise<Ticket[]> {
     return db.select().from(tickets).where(eq(tickets.userId, userId));
+  }
+
+  async getAllTickets(): Promise<Ticket[]> {
+    return db.select().from(tickets);
   }
 
   async getTicket(id: number): Promise<Ticket | undefined> {
@@ -262,6 +272,38 @@ class DatabaseStorage implements IStorage {
     }
     const [created] = await db.insert(userRoles).values(userRole as any).returning();
     return created;
+  }
+
+  async getAllUsers(): Promise<User[]> {
+    return db.select().from(users);
+  }
+
+  async deleteEvent(id: number): Promise<boolean> {
+    // Delete related data first to maintain referential integrity
+    await db.delete(aiRecommendations).where(eq(aiRecommendations.eventId, id));
+    await db.delete(notifications).where(eq(notifications.eventId, id));
+    await db.delete(parkingLots).where(eq(parkingLots.eventId, id));
+    await db.delete(venueZones).where(eq(venueZones.eventId, id));
+    await db.delete(tickets).where(eq(tickets.eventId, id));
+    await db.delete(ticketCategories).where(eq(ticketCategories.eventId, id));
+    await db.delete(userRoles).where(eq(userRoles.eventId, id));
+    const result = await db.delete(events).where(eq(events.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async getAdminStats(): Promise<{ totalUsers: number; totalEvents: number; totalTickets: number; totalRevenue: number }> {
+    const [allUsers, allEvents, allTickets] = await Promise.all([
+      db.select().from(users),
+      db.select().from(events),
+      db.select().from(tickets),
+    ]);
+    const totalRevenue = allTickets.reduce((sum, t) => sum + (t.price || 0), 0);
+    return {
+      totalUsers: allUsers.length,
+      totalEvents: allEvents.length,
+      totalTickets: allTickets.length,
+      totalRevenue,
+    };
   }
 
   async getRecommendations(eventId: number): Promise<AiRecommendation[]> {

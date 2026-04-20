@@ -34,12 +34,12 @@ export default function OrganizerMap() {
       <div className="p-6 flex items-center justify-center min-h-[60vh]">
         <Card className="max-w-md w-full">
           <CardHeader className="text-center">
-            <h2 className="text-xl font-semibold">No Events Yet</h2>
+            <h2 className="text-xl font-semibold">{t("common.noEvents")}</h2>
           </CardHeader>
           <CardContent>
             <Button className="w-full" onClick={() => seedMutation.mutate()} disabled={seedMutation.isPending} data-testid="button-seed-data">
               <Database className="h-4 w-4 mr-2" />
-              {seedMutation.isPending ? "Creating..." : "Create Demo Event"}
+              {seedMutation.isPending ? t("common.loading") : t("tickets.createDemo")}
             </Button>
           </CardContent>
         </Card>
@@ -61,19 +61,21 @@ export default function OrganizerMap() {
     <div className="p-6 space-y-6">
       <div>
         <h1 className="text-2xl font-bold" data-testid="text-org-map-title">{t("map.title")}</h1>
-        <p className="text-muted-foreground text-sm">{activeEvent.name} - Interactive zone management</p>
+        <p className="text-muted-foreground text-sm">{activeEvent.name} — {t("map.interactiveDesc")}</p>
       </div>
 
-      {zonesLoading ? <Skeleton className="h-[500px]" /> : (
-        <VenueMap zones={mappedZones} activeZone={activeZone} onZoneClick={setActiveZone} />
-      )}
+      {zonesLoading
+        ? <Skeleton className="h-[500px]" />
+        : <VenueMap zones={mappedZones} activeZone={activeZone} onZoneClick={setActiveZone} />}
 
       <Card>
         <CardHeader className="pb-3">
-          <h3 className="font-semibold">Zone Details</h3>
+          <h3 className="font-semibold">{t("map.zoneDetails")}</h3>
         </CardHeader>
         <CardContent className="space-y-4">
-          {(zones || []).map((z: any) => (
+          {(zones || []).length === 0 ? (
+            <p className="text-sm text-muted-foreground">{t("overview.noZones")}</p>
+          ) : (zones || []).map((z: any) => (
             <CapacityMeter
               key={z.id}
               current={z.currentOccupancy || 0}

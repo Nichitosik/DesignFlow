@@ -29,23 +29,28 @@ export const events = pgTable("events", {
   createdBy: varchar("created_by").references(() => users.id),
   maxCapacity: integer("max_capacity").notNull(),
   currentAttendance: integer("current_attendance").default(0),
+  imageUrl: text("image_url"),
+  address: text("address"),
 });
 
 export const userRoles = pgTable("user_roles", {
   id: serial("id").primaryKey(),
   userId: varchar("user_id").references(() => users.id).notNull(),
-  role: text("role").notNull().$type<"spectator" | "staff" | "organizer">(),
+  role: text("role").notNull().$type<"spectator" | "staff" | "organizer" | "admin">(),
   eventId: integer("event_id").references(() => events.id),
 });
 
 export const ticketCategories = pgTable("ticket_categories", {
   id: serial("id").primaryKey(),
   eventId: integer("event_id").references(() => events.id).notNull(),
-  name: text("name").notNull().$type<"Main" | "Tribuna" | "VIP">(),
+  name: text("name").notNull(),
+  zoneType: text("zone_type").notNull().default("main").$type<"main" | "tribune" | "vip">(),
   price: doublePrecision("price").notNull(),
   capacity: integer("capacity").notNull(),
   sold: integer("sold").default(0),
   color: text("color").default("#6366f1"),
+  rowCount: integer("row_count").default(10),
+  seatsPerRow: integer("seats_per_row").default(20),
 });
 
 export const tickets = pgTable("tickets", {
@@ -55,7 +60,7 @@ export const tickets = pgTable("tickets", {
   userId: varchar("user_id").references(() => users.id),
   zone: text("zone").notNull(),
   seat: text("seat"),
-  category: text("category").notNull().$type<"Main" | "Tribuna" | "VIP">().default("Main"),
+  category: text("category").notNull().default("Main"),
   price: doublePrecision("price").default(0),
   status: text("status").notNull().$type<"valid" | "used" | "invalid" | "pending">(),
   purchasedAt: timestamp("purchased_at").defaultNow(),
@@ -165,13 +170,16 @@ export const insertVenueSchema = createInsertSchema(venues).omit({ id: true });
 export type InsertVenue = z.infer<typeof insertVenueSchema>;
 export type Venue = typeof venues.$inferSelect;
 
-export const insertEventSchema = createInsertSchema(events).omit({ id: true, currentAttendance: true });
+export const insertEventSchema = createInsertSchema(events)
+  .omit({ id: true, currentAttendance: true })
+  .extend({ date: z.coerce.date() });
 export type InsertEvent = z.infer<typeof insertEventSchema>;
 export type Event = typeof events.$inferSelect;
 
 export const insertUserRoleSchema = createInsertSchema(userRoles).omit({ id: true });
 export type InsertUserRole = z.infer<typeof insertUserRoleSchema>;
 export type UserRole = typeof userRoles.$inferSelect;
+export type UserRoleType = "spectator" | "staff" | "organizer" | "admin";
 
 export const insertTicketCategorySchema = createInsertSchema(ticketCategories).omit({ id: true, sold: true });
 export type InsertTicketCategory = z.infer<typeof insertTicketCategorySchema>;

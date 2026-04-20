@@ -228,7 +228,7 @@ export default function OrganizerAnalytics() {
 
         <Card>
           <CardHeader className="pb-3">
-            <h3 className="font-semibold">Ticket Distribution</h3>
+            <h3 className="font-semibold">Distribuție bilete</h3>
           </CardHeader>
           <CardContent className="space-y-3">
             {[

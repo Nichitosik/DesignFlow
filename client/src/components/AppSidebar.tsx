@@ -10,8 +10,8 @@ import {
   SidebarHeader,
   SidebarFooter,
 } from "@/components/ui/sidebar";
-import { 
-  Ticket, 
+import {
+  Ticket,
   Gauge,
   Map,
   Car,
@@ -21,13 +21,15 @@ import {
   Activity,
   Navigation,
   CalendarDays,
+  ShieldCheck,
+  Users,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { useI18n } from "@/lib/i18n";
 
-type UserRole = "spectator" | "staff" | "organizer";
+type UserRole = "spectator" | "staff" | "organizer" | "admin";
 
 interface AppSidebarProps {
   role: UserRole;
@@ -38,7 +40,6 @@ const roleMenuDefs: Record<UserRole, { titleKey: string; url: string; icon: any;
   spectator: [
     { titleKey: "nav.events", url: "/spectator/events", icon: CalendarDays, testId: "link-events" },
     { titleKey: "nav.myTickets", url: "/spectator/tickets", icon: Ticket, testId: "link-my-tickets" },
-    { titleKey: "nav.venueMap", url: "/spectator/map", icon: Map, testId: "link-venue-map" },
     { titleKey: "nav.directions", url: "/spectator/directions", icon: Navigation, testId: "link-directions" },
     { titleKey: "nav.parking", url: "/spectator/parking", icon: Car, testId: "link-parking" },
   ],
@@ -49,10 +50,12 @@ const roleMenuDefs: Record<UserRole, { titleKey: string; url: string; icon: any;
   ],
   organizer: [
     { titleKey: "nav.overview", url: "/organizer/overview", icon: Gauge, testId: "link-overview" },
-    { titleKey: "nav.venueMap", url: "/organizer/map", icon: Map, testId: "link-venue-map" },
     { titleKey: "nav.parking", url: "/organizer/parking", icon: Car, testId: "link-parking" },
     { titleKey: "nav.analytics", url: "/organizer/analytics", icon: BarChart3, testId: "link-analytics" },
     { titleKey: "nav.aiInsights", url: "/organizer/ai", icon: Brain, testId: "link-ai-insights" },
+  ],
+  admin: [
+    { titleKey: "nav.adminPanel", url: "/admin/panel", icon: ShieldCheck, testId: "link-admin-panel" },
   ],
 };
 
@@ -60,6 +63,7 @@ const roleBadgeColors: Record<UserRole, string> = {
   spectator: "bg-[hsl(200,80%,50%)] text-white border-0",
   staff: "bg-[hsl(38,90%,55%)] text-white border-0",
   organizer: "bg-primary text-primary-foreground border-0",
+  admin: "bg-[hsl(0,80%,55%)] text-white border-0",
 };
 
 export function AppSidebar({ role, userName = "User" }: AppSidebarProps) {

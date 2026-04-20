@@ -1,9 +1,10 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { MapPin, Navigation, ExternalLink, LocateFixed, Loader2, AlertCircle, CheckCircle2 } from "lucide-react";
+import { MapPin, Navigation, ExternalLink, Loader2, AlertCircle, CheckCircle2 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useI18n } from "@/lib/i18n";
+import { GoogleMapView } from "@/components/GoogleMapView";
 
 const DEFAULT_LAT = 47.0245;
 const DEFAULT_LNG = 28.8327;
@@ -32,40 +33,13 @@ export default function SpectatorDirections() {
   const venueLng = venue?.longitude ?? DEFAULT_LNG;
 
   useEffect(() => {
-    if (!navigator.geolocation) {
-      setGeoStatus("unavailable");
-      return;
-    }
+    if (!navigator.geolocation) { setGeoStatus("unavailable"); return; }
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setUserLat(pos.coords.latitude);
-        setUserLng(pos.coords.longitude);
-        setGeoStatus("located");
-      },
-      () => {
-        setGeoStatus("unavailable");
-      },
-      { timeout: 12000, enableHighAccuracy: true }
-    );
-  }, []);
-
-  const retryLocation = () => {
-    setGeoStatus("locating");
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setUserLat(pos.coords.latitude);
-        setUserLng(pos.coords.longitude);
-        setGeoStatus("located");
-      },
+      (pos) => { setUserLat(pos.coords.latitude); setUserLng(pos.coords.longitude); setGeoStatus("located"); },
       () => setGeoStatus("unavailable"),
       { timeout: 12000, enableHighAccuracy: true }
     );
-  };
-
-  const mapEmbedUrl =
-    geoStatus === "located" && userLat !== null && userLng !== null
-      ? `https://maps.google.com/maps?saddr=${userLat},${userLng}&daddr=${venueLat},${venueLng}&output=embed`
-      : `https://maps.google.com/maps?q=${venueLat},${venueLng}&z=15&output=embed`;
+  }, []);
 
   const navigationUrl =
     geoStatus === "located" && userLat !== null && userLng !== null
@@ -81,50 +55,44 @@ export default function SpectatorDirections() {
         {activeEvent && (
           <p className="text-muted-foreground text-sm mt-1">
             {activeEvent.name}
-            {activeEvent.date && ` · ${new Date(activeEvent.date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}`}
-            {activeEvent.startTime && ` at ${activeEvent.startTime}`}
+            {activeEvent.date && ` · ${new Date(activeEvent.date).toLocaleDateString("ro-MD", { weekday: "short", month: "short", day: "numeric" })}`}
+            {activeEvent.startTime && ` · ${activeEvent.startTime}`}
           </p>
         )}
       </div>
 
-      <div
-        className={`flex items-center gap-2.5 p-3 rounded-md border text-sm ${
-          geoStatus === "locating"
-            ? "border-[hsl(38,90%,55%)]/30 bg-[hsl(38,90%,55%)]/5 text-[hsl(38,90%,55%)]"
-            : geoStatus === "located"
-            ? "border-[hsl(142,70%,45%)]/30 bg-[hsl(142,70%,45%)]/5 text-[hsl(142,70%,45%)]"
-            : "border-muted bg-muted/30 text-muted-foreground"
-        }`}
-        data-testid="geo-status-banner"
-      >
+      {/* Location status indicator */}
+      <div className={`flex items-center gap-2 text-sm px-3 py-2 rounded-md border ${
+        geoStatus === "located"
+          ? "border-[hsl(142,70%,45%)]/30 bg-[hsl(142,70%,45%)]/5 text-[hsl(142,70%,45%)]"
+          : geoStatus === "locating"
+          ? "border-[hsl(38,90%,55%)]/30 bg-[hsl(38,90%,55%)]/5 text-[hsl(38,90%,55%)]"
+          : "border-muted bg-muted/30 text-muted-foreground"
+      }`}>
         {geoStatus === "locating" && <Loader2 className="h-4 w-4 animate-spin shrink-0" />}
         {geoStatus === "located" && <CheckCircle2 className="h-4 w-4 shrink-0" />}
         {geoStatus === "unavailable" && <AlertCircle className="h-4 w-4 shrink-0" />}
-        <span className="flex-1">
+        <span>
           {geoStatus === "locating" && t("directions.locating")}
           {geoStatus === "located" && t("directions.located")}
           {geoStatus === "unavailable" && t("directions.locationUnavailable")}
         </span>
-        {geoStatus === "unavailable" && (
-          <Button size="sm" variant="ghost" onClick={retryLocation} data-testid="button-retry-location">
-            <LocateFixed className="h-3.5 w-3.5 mr-1" />
-            Retry
-          </Button>
-        )}
       </div>
 
+      {/* Google Map */}
       <Card className="overflow-hidden" data-testid="map-card">
-        <iframe
-          key={mapEmbedUrl}
-          src={mapEmbedUrl}
-          width="100%"
-          height="380"
-          style={{ border: 0, display: "block" }}
-          title="Navigation Map"
-          data-testid="map-iframe"
-          loading="lazy"
-          allowFullScreen
-        />
+        <div className="p-3">
+          <GoogleMapView
+            venueLat={venueLat}
+            venueLng={venueLng}
+            venueName={venueName}
+            userLat={geoStatus === "located" ? userLat : null}
+            userLng={geoStatus === "located" ? userLng : null}
+            showDirections={geoStatus === "located"}
+            height={420}
+            zoom={14}
+          />
+        </div>
         <div className="px-4 py-3 border-t flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-2 min-w-0">
             <MapPin className="h-4 w-4 text-primary shrink-0" />
@@ -133,12 +101,7 @@ export default function SpectatorDirections() {
               <p className="text-xs text-muted-foreground truncate">{venueAddress}</p>
             </div>
           </div>
-          <a
-            href={`https://www.google.com/maps/search/${venueLat},${venueLng}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            data-testid="link-open-google-maps"
-          >
+          <a href={`https://www.google.com/maps/search/${venueLat},${venueLng}`} target="_blank" rel="noopener noreferrer" data-testid="link-open-google-maps">
             <Button variant="outline" size="sm">
               <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
               {t("directions.openInMaps")}
@@ -147,23 +110,16 @@ export default function SpectatorDirections() {
         </div>
       </Card>
 
-      <a
-        href={navigationUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        data-testid="link-open-navigation"
-        className="block"
-      >
-        <Button className="w-full" size="default">
+      {/* Navigate button */}
+      <a href={navigationUrl} target="_blank" rel="noopener noreferrer" data-testid="link-open-navigation" className="block">
+        <Button className="w-full" size="lg">
           <Navigation className="h-4 w-4 mr-2" />
           {geoStatus === "located" ? t("directions.openNavigationFromLocation") : t("directions.openNavigation")}
         </Button>
       </a>
 
       {geoStatus === "unavailable" && (
-        <p className="text-xs text-center text-muted-foreground">
-          {t("directions.locationTip")}
-        </p>
+        <p className="text-xs text-center text-muted-foreground">{t("directions.locationTip")}</p>
       )}
     </div>
   );
